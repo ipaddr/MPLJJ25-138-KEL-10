@@ -27,7 +27,7 @@ class WelcomeAdminScreen extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 20,
-                    color: Colors.orange,
+                    color: Color.fromARGB(255, 252, 134, 0),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -56,7 +56,7 @@ class WelcomeAdminScreen extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 14,
-                    color: Colors.black54,
+                    color: Color(0xFF0072CE),
                   ),
                 ),
                 const SizedBox(height: 40),
