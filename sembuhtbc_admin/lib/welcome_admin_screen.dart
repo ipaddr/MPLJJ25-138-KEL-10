@@ -26,7 +26,7 @@ class WelcomeAdminScreen extends StatelessWidget {
                   'Selamat Datang di',
                   style: TextStyle(
                     fontFamily: 'Roboto',
-                    fontSize: 20,
+                    fontSize: 25,
                     color: Color.fromARGB(255, 252, 134, 0),
                     fontWeight: FontWeight.w600,
                   ),
@@ -35,7 +35,7 @@ class WelcomeAdminScreen extends StatelessWidget {
                   'SembuhTBC',
                   style: TextStyle(
                     fontFamily: 'Roboto',
-                    fontSize: 32,
+                    fontSize: 44,
                     color: Color(0xFF0072CE),
                     fontWeight: FontWeight.bold,
                   ),
@@ -44,7 +44,7 @@ class WelcomeAdminScreen extends StatelessWidget {
                   'versi Admin',
                   style: TextStyle(
                     fontFamily: 'Roboto',
-                    fontSize: 18,
+                    fontSize: 25,
                     color: Colors.red,
                     fontWeight: FontWeight.w600,
                   ),
@@ -67,8 +67,8 @@ class WelcomeAdminScreen extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFF0072CE),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 50,
-                      vertical: 15,
+                      horizontal: 105.5,
+                      vertical: 19,
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),

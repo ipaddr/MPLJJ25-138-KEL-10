@@ -22,6 +22,7 @@ class LoginScreen extends StatelessWidget {
               const Text(
                 'Selamat datang kembali!',
                 style: TextStyle(
+                  fontFamily: 'Urbanist',
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF0072CE),
@@ -30,15 +31,21 @@ class LoginScreen extends StatelessWidget {
               const Text(
                 'Senang melihat Anda lagi!',
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
+                  fontFamily: 'Urbanist',
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
                   color: Color(0xFF0072CE),
                 ),
               ),
               const SizedBox(height: 30),
               TextField(
+                style: TextStyle(fontFamily: 'Urbanist', fontSize: 16),
                 decoration: InputDecoration(
                   labelText: 'Masukkan email Anda',
+                  labelStyle: TextStyle(
+                    fontFamily: 'Urbanist',
+                    color: const Color.fromARGB(255, 128, 128, 128),
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -47,29 +54,37 @@ class LoginScreen extends StatelessWidget {
               const SizedBox(height: 20),
               TextField(
                 obscureText: true,
+                style: TextStyle(fontFamily: 'Urbanist', fontSize: 16),
                 decoration: InputDecoration(
                   labelText: 'Masukkan sandi Anda',
+                  labelStyle: TextStyle(
+                    fontFamily: 'Urbanist',
+                    color: const Color.fromARGB(255, 128, 128, 128),
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                   suffixIcon: Icon(Icons.visibility_off),
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 40),
               ElevatedButton(
                 onPressed: () {
                   // Aksi login di sini
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Color(0xFF0072CE),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 106,
+                    vertical: 19,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
                 child: const Text(
                   'Login',
-                  style: TextStyle(color: Colors.white),
+                  style: TextStyle(fontFamily: 'Urbanist', color: Colors.white),
                 ),
               ),
             ],
