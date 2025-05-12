@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:user/pages/welcome_page.dart';
-import 'package:user/pages/login_page.dart'; // Import LoginPage
+import 'package:user/pages/login_page.dart';
+import 'package:user/pages/register_page.dart'; // Import halaman register
 
 void main() {
   runApp(const SembuhTBCApp());
@@ -19,6 +20,7 @@ class SembuhTBCApp extends StatelessWidget {
       routes: {
         '/': (context) => const WelcomePage(),
         '/login': (context) => const LoginPage(),
+        '/register': (context) => const RegisterPage(),
       },
     );
   }

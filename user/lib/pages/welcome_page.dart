@@ -39,6 +39,7 @@ class WelcomePage extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 48),
+
                 // Tombol Login
                 SizedBox(
                   width: double.infinity,
@@ -57,16 +58,13 @@ class WelcomePage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Tombol Daftar (sementara hanya tampil alert)
+
+                // Tombol Daftar
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Halaman Daftar belum dibuat'),
-                        ),
-                      );
+                      Navigator.pushNamed(context, '/register');
                     },
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),

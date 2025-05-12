@@ -93,7 +93,9 @@ class _LoginPageState extends State<LoginPage> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    // TODO: proses login
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF005EB8),
                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -119,7 +121,9 @@ class _LoginPageState extends State<LoginPage> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () {
+                    // TODO: proses login Google
+                  },
                   icon: Image.asset(
                     'assets/images/google_logo.png',
                     height: 24,
@@ -139,7 +143,9 @@ class _LoginPageState extends State<LoginPage> {
                 children: [
                   const Text("Belum memiliki akun? "),
                   GestureDetector(
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.pushNamed(context, '/register');
+                    },
                     child: const Text(
                       "Daftar",
                       style: TextStyle(
