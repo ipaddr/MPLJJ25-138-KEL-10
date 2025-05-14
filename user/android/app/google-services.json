@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "118240719864",
+    "project_id": "sembuhtbcuser",
+    "storage_bucket": "sembuhtbcuser.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:118240719864:android:afb999b76266f007f59c0d",
+        "android_client_info": {
+          "package_name": "com.example.user"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqpYlDr8qt5p4abhAyUHalY2byBLGJCNw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
