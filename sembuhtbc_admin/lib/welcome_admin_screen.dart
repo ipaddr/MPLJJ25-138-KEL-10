@@ -17,7 +17,7 @@ class WelcomeAdminScreen extends StatelessWidget {
                 SizedBox(
                   height: 180,
                   child: Image.asset(
-                    'assets/images/welcome_scr.png', // <--- Ganti dengan path gambar Anda
+                    'assets/images/clock.png', // <--- Ganti dengan path gambar Anda
                     fit: BoxFit.contain,
                   ),
                 ),

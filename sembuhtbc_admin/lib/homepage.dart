@@ -47,7 +47,7 @@ class HomePage extends StatelessWidget {
             SizedBox(
               height: 200,
               child: Image.asset(
-                'assets/images/calendar_medicine.png', // Ganti dengan path sesuai asset kamu
+                'assets/images/calendar.png', // Ganti dengan path sesuai asset kamu
                 fit: BoxFit.contain,
               ),
             ),
