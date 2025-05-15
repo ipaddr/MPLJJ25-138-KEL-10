@@ -41,7 +41,12 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
         elevation: 0,
         title: const Text(
           'Profil Admin',
-          style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontFamily: 'Montserrat',
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0072CE),
+          ),
         ),
         centerTitle: true,
       ),
@@ -133,13 +138,21 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: Color(0xFF0072CE),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 105.5,
+                    vertical: 19,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 child: const Text(
                   "Simpan",
                   style: TextStyle(
+                    fontFamily: 'Montserrat',
                     color: Colors.white,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -153,7 +166,14 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
               onPressed: () {
                 Navigator.pushReplacementNamed(context, '/login');
               },
-              child: const Text("Logout", style: TextStyle(color: Colors.red)),
+              child: const Text(
+                "Logout",
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 16,
+                  color: Colors.red,
+                ),
+              ),
             ),
           ],
         ),

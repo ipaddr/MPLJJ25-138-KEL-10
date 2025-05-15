@@ -24,15 +24,13 @@ class _ManageMedPageState extends State<ManageMedPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Center(
-          child: Text(
-            'Tambah Jadwal Obat',
-            style: TextStyle(
-              fontFamily: 'Montserrat',
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF0072CE),
-            ),
+        title: const Text(
+          'Tambah Jadwal Obat',
+          style: TextStyle(
+            fontFamily: 'Montserrat',
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0072CE),
           ),
         ),
         leading: Padding(
