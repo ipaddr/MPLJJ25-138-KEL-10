@@ -60,25 +60,29 @@ class WelcomeAdminScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 40),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/login');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF0072CE),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 105.5,
-                      vertical: 19,
+                SizedBox(
+                  width: 327,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/login');
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF0072CE),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 105.5,
+                        vertical: 19,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text(
-                    'Login',
-                    style: TextStyle(
-                      fontFamily: 'Urbanist',
-                      color: Colors.white,
+                    child: const Text(
+                      'Login',
+                      style: TextStyle(
+                        fontFamily: 'Urbanist',
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),

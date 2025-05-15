@@ -79,9 +79,18 @@ flutter:
         - asset: fonts/Urbanist-Bold.ttf
           weight: 700
 
-  assets:
-    - assets/images/welcome_scr.png
+    # Urbanist Font
+    - family: Montserrat
+      fonts:
+        - asset: fonts/Montserrat-Regular.ttf
+        - asset: fonts/Montserrat-Medium.ttf
+          weight: 500
+        - asset: fonts/Montserrat-Bold.ttf
+          weight: 700
 
+  assets:
+    - assets/images/calendar_icon.png
+    - assets/images/welcome_scr.png
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
