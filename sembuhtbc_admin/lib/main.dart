@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:sembuhtbc_admin/manage_med.dart';
 import 'welcome_admin_screen.dart';
 import 'login_screen.dart';
 import 'homepage.dart';
+import 'profile_admin.dart';
 
 void main() {
   runApp(const MyApp());
@@ -26,6 +28,8 @@ class MyApp extends StatelessWidget {
         '/': (context) => const WelcomeAdminScreen(),
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomePage(),
+        '/manage': (context) => const ManageMedPage(),
+        '/profile': (context) => const ProfileAdminPage(),
       },
     );
   }

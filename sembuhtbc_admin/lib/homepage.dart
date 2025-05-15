@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'manage_med.dart';
+import 'profile_admin.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -34,7 +36,7 @@ class HomePage extends StatelessWidget {
                       color: Colors.black54,
                     ),
                     onPressed: () {
-                      // Tambahkan logika pengaturan di sini
+                      Navigator.pushReplacementNamed(context, '/profile');
                     },
                   ),
                 ],
@@ -47,25 +49,26 @@ class HomePage extends StatelessWidget {
             SizedBox(
               height: 200,
               child: Image.asset(
-                'assets/images/calendar.png', // Ganti dengan path sesuai asset kamu
+                'assets/images/calendar_icon.png', // Ganti dengan path sesuai asset kamu
                 fit: BoxFit.contain,
               ),
             ),
 
-            const SizedBox(height: 30),
+            const SizedBox(height: 16),
 
             // Judul
             const Text(
               'Kelola obat\npasien Anda',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 20,
+                fontFamily: 'Montserrat',
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Colors.blue,
+                color: Color(0xFF0072CE),
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
             // Subjudul
             const Padding(
@@ -73,7 +76,11 @@ class HomePage extends StatelessWidget {
               child: Text(
                 'Input jadwal obat pasien agar sistem dapat mengingatkan sesuai waktu yang ditentukan',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey),
+                style: TextStyle(
+                  fontFamily: 'Montserrat',
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
               ),
             ),
 
@@ -93,14 +100,15 @@ class HomePage extends StatelessWidget {
                     ),
                   ),
                   onPressed: () {
-                    // Tambahkan aksi navigasi ke halaman input obat
+                    Navigator.pushReplacementNamed(context, '/manage');
                   },
                   child: const Text(
                     'Tambahkan Obat',
                     style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.white,
+                      fontFamily: 'Montserrat',
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
+                      color: Color.fromARGB(255, 255, 255, 255),
                     ),
                   ),
                 ),
@@ -112,9 +120,16 @@ class HomePage extends StatelessWidget {
             // Tombol Logout
             TextButton(
               onPressed: () {
-                Navigator.pushReplacementNamed(context, '/login');
+                Navigator.pushReplacementNamed(context, '/');
               },
-              child: const Text('Logout', style: TextStyle(color: Colors.red)),
+              child: const Text(
+                'Logout',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 16,
+                  color: Colors.red,
+                ),
+              ),
             ),
 
             const SizedBox(height: 20),
