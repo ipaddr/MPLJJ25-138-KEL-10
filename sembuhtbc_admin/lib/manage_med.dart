@@ -13,12 +13,94 @@ class _ManageMedPageState extends State<ManageMedPage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _doseController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _dateTimeController = TextEditingController();
+  final TextEditingController _timeController = TextEditingController();
+  final TextEditingController _timesPerDayController = TextEditingController();
+  final TextEditingController _daysController = TextEditingController();
 
   String? _selectedType;
+  String? _selectedInterval;
+  String? _customInterval;
   bool _alarmEnabled = false;
 
   final List<String> _typeOptions = ['Tablet', 'Kapsul', 'Sirup', 'Injeksi'];
+
+  @override
+  void dispose() {
+    _idController.dispose();
+    _nameController.dispose();
+    _doseController.dispose();
+    _amountController.dispose();
+    _timeController.dispose();
+    _timesPerDayController.dispose();
+    _daysController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _showCustomIntervalDialog(BuildContext context) async {
+    final intervalController = TextEditingController();
+    await showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text("Interval Custom"),
+            content: TextFormField(
+              controller: intervalController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: "Interval (jam)",
+                hintText: "Misal: 5 untuk 5 jam",
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Batal"),
+              ),
+              TextButton(
+                onPressed: () {
+                  if (intervalController.text.isNotEmpty) {
+                    setState(() {
+                      _customInterval = intervalController.text;
+                      _selectedInterval = "custom";
+                    });
+                    Navigator.pop(context);
+                  }
+                },
+                child: const Text("Simpan"),
+              ),
+            ],
+          ),
+    );
+  }
+
+  List<String> _calculateDoseTimes(
+    String firstDose,
+    int timesPerDay,
+    int intervalHours,
+  ) {
+    List<String> doseTimes = [];
+    if (firstDose.isEmpty) return doseTimes;
+
+    try {
+      final timeParts = firstDose.split(':');
+      int hour = int.parse(timeParts[0]);
+      int minute = int.parse(timeParts[1]);
+
+      for (int i = 0; i < timesPerDay; i++) {
+        doseTimes.add(
+          "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}",
+        );
+        hour += intervalHours;
+        if (hour >= 24) {
+          hour -= 24;
+        }
+      }
+    } catch (e) {
+      debugPrint("Error calculating dose times: $e");
+    }
+
+    return doseTimes;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +157,7 @@ class _ManageMedPageState extends State<ManageMedPage> {
             children: [
               // ID Pasien
               const Text(
-                "ID pasien*",
+                "ID Pasien*",
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 16,
@@ -94,7 +176,9 @@ class _ManageMedPageState extends State<ManageMedPage> {
                     borderSide: BorderSide(color: Color(0xFF0072CE)),
                   ),
                 ),
-                validator: (value) => value!.isEmpty ? 'Wajib diisi' : null,
+                validator:
+                    (value) =>
+                        value == null || value.isEmpty ? 'Wajib diisi' : null,
               ),
               const SizedBox(height: 16),
 
@@ -119,7 +203,9 @@ class _ManageMedPageState extends State<ManageMedPage> {
                     borderSide: BorderSide(color: Color(0xFF0072CE)),
                   ),
                 ),
-                validator: (value) => value!.isEmpty ? 'Wajib diisi' : null,
+                validator:
+                    (value) =>
+                        value == null || value.isEmpty ? 'Wajib diisi' : null,
               ),
               const SizedBox(height: 16),
 
@@ -178,7 +264,9 @@ class _ManageMedPageState extends State<ManageMedPage> {
                     borderSide: BorderSide(color: Color(0xFF0072CE)),
                   ),
                 ),
-                validator: (value) => value!.isEmpty ? 'Wajib diisi' : null,
+                validator:
+                    (value) =>
+                        value == null || value.isEmpty ? 'Wajib diisi' : null,
               ),
               const SizedBox(height: 16),
 
@@ -194,8 +282,9 @@ class _ManageMedPageState extends State<ManageMedPage> {
               const SizedBox(height: 6),
               TextFormField(
                 controller: _amountController,
+                keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  hintText: "Dosis (contoh: 3)",
+                  hintText: "Jumlah obat (contoh: 30 tablet)",
                   border: OutlineInputBorder(
                     borderSide: BorderSide(color: Colors.grey.shade300),
                   ),
@@ -203,13 +292,15 @@ class _ManageMedPageState extends State<ManageMedPage> {
                     borderSide: BorderSide(color: Color(0xFF0072CE)),
                   ),
                 ),
-                validator: (value) => value!.isEmpty ? 'Wajib diisi' : null,
+                validator:
+                    (value) =>
+                        value == null || value.isEmpty ? 'Wajib diisi' : null,
               ),
               const SizedBox(height: 16),
 
-              // Tanggal & Waktu
+              // Pengingat - Waktu Minum Obat
               const Text(
-                "Tanggal",
+                "Waktu Minum Obat*",
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 16,
@@ -218,10 +309,10 @@ class _ManageMedPageState extends State<ManageMedPage> {
               ),
               const SizedBox(height: 6),
               TextFormField(
-                controller: _dateTimeController,
+                controller: _timeController,
                 decoration: InputDecoration(
-                  hintText: "hh/bb/tttt , 00:00",
-                  prefixIcon: Icon(Icons.calendar_today),
+                  hintText: "Pilih waktu (contoh: 08:00)",
+                  prefixIcon: const Icon(Icons.access_time),
                   border: OutlineInputBorder(
                     borderSide: BorderSide(color: Colors.grey.shade300),
                   ),
@@ -231,36 +322,133 @@ class _ManageMedPageState extends State<ManageMedPage> {
                 ),
                 readOnly: true,
                 onTap: () async {
-                  DateTime? pickedDate = await showDatePicker(
+                  TimeOfDay? pickedTime = await showTimePicker(
                     context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2100),
+                    initialTime: TimeOfDay.now(),
                   );
 
-                  if (pickedDate != null) {
-                    TimeOfDay? pickedTime = await showTimePicker(
-                      context: context,
-                      initialTime: TimeOfDay.now(),
-                    );
-
-                    if (pickedTime != null) {
-                      final selectedDateTime = DateTime(
-                        pickedDate.year,
-                        pickedDate.month,
-                        pickedDate.day,
-                        pickedTime.hour,
-                        pickedTime.minute,
-                      );
-
-                      setState(() {
-                        _dateTimeController.text =
-                            "${selectedDateTime.day.toString().padLeft(2, '0')}/${selectedDateTime.month.toString().padLeft(2, '0')}/${selectedDateTime.year}, "
-                            "${pickedTime.format(context)}";
-                      });
-                    }
+                  if (pickedTime != null) {
+                    setState(() {
+                      _timeController.text = pickedTime.format(context);
+                    });
                   }
                 },
+                validator:
+                    (value) =>
+                        value == null || value.isEmpty ? 'Wajib diisi' : null,
+              ),
+              const SizedBox(height: 16),
+
+              // Frekuensi Minum per Hari
+              const Text(
+                "Berapa Kali Sehari*",
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextFormField(
+                      controller: _timesPerDayController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: "Jumlah (contoh: 3)",
+                        border: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF0072CE)),
+                        ),
+                      ),
+                      validator:
+                          (value) =>
+                              value == null || value.isEmpty
+                                  ? 'Wajib diisi'
+                                  : null,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 3,
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedInterval,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF0072CE)),
+                        ),
+                      ),
+                      hint: const Text("Interval Waktu"),
+                      items: const [
+                        DropdownMenuItem(
+                          value: "4",
+                          child: Text("Setiap 4 jam"),
+                        ),
+                        DropdownMenuItem(
+                          value: "6",
+                          child: Text("Setiap 6 jam"),
+                        ),
+                        DropdownMenuItem(
+                          value: "8",
+                          child: Text("Setiap 8 jam"),
+                        ),
+                        DropdownMenuItem(
+                          value: "12",
+                          child: Text("Setiap 12 jam"),
+                        ),
+                        DropdownMenuItem(
+                          value: "custom",
+                          child: Text("Custom"),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedInterval = value;
+                          if (value == "custom") {
+                            _showCustomIntervalDialog(context);
+                          }
+                        });
+                      },
+                      validator:
+                          (value) => value == null ? 'Wajib dipilih' : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Lama Pengobatan (hari)
+              const Text(
+                "Lama Pengobatan (hari)*",
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: _daysController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  hintText: "Durasi (contoh: 30 hari)",
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Color(0xFF0072CE)),
+                  ),
+                ),
+                validator:
+                    (value) =>
+                        value == null || value.isEmpty ? 'Wajib diisi' : null,
               ),
               const SizedBox(height: 16),
 
@@ -294,16 +482,43 @@ class _ManageMedPageState extends State<ManageMedPage> {
                 child: ElevatedButton(
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
-                      // Simpan logika data
+                      final timesPerDay =
+                          int.tryParse(_timesPerDayController.text) ?? 0;
+                      final days = int.tryParse(_daysController.text) ?? 0;
+                      final totalPills = timesPerDay * days;
+
+                      final interval =
+                          _selectedInterval == "custom"
+                              ? int.tryParse(_customInterval ?? "0") ?? 0
+                              : int.tryParse(_selectedInterval ?? "0") ?? 0;
+
+                      final doseTimes = _calculateDoseTimes(
+                        _timeController.text,
+                        timesPerDay,
+                        interval,
+                      );
+
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Jadwal obat berhasil disimpan"),
+                        SnackBar(
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text("Jadwal obat berhasil disimpan"),
+                              Text(
+                                "Total obat: $totalPills ${_selectedType ?? 'pcs'}",
+                              ),
+                              if (doseTimes.isNotEmpty)
+                                Text("Jadwal minum: ${doseTimes.join(', ')}"),
+                            ],
+                          ),
+                          duration: const Duration(seconds: 4),
                         ),
                       );
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF0072CE),
+                    backgroundColor: const Color(0xFF0072CE),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 105.5,
                       vertical: 19,

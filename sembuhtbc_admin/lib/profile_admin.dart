@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class ProfileAdminPage extends StatefulWidget {
   const ProfileAdminPage({super.key});
@@ -21,10 +23,39 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
     text: "Perempuan",
   );
   final TextEditingController _dobController = TextEditingController(
-    text: "9 Januari 2000",
+    text: "09/01/2000",
   );
 
   bool _isPasswordVisible = false;
+  DateTime? _selectedDate;
+  File? _profileImage;
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      setState(() {
+        _profileImage = File(pickedFile.path);
+      });
+    }
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime(2000, 1, 9),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+        _dobController.text =
+            "${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}";
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,11 +63,33 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () {
-            Navigator.pushReplacementNamed(context, '/home');
-          },
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: TextButton(
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(color: Colors.grey[300]!, width: 1),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pushReplacementNamed(context, '/home');
+                },
+                child: const Icon(
+                  Icons.arrow_back,
+                  size: 24,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ),
         ),
         elevation: 0,
         title: const Text(
@@ -62,17 +115,22 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
                 Stack(
                   alignment: Alignment.bottomRight,
                   children: [
-                    const CircleAvatar(
+                    CircleAvatar(
                       radius: 50,
-                      backgroundImage: AssetImage(
-                        "assets/images/avatar.png",
-                      ), // Ganti sesuai gambar kamu
+                      backgroundImage:
+                          _profileImage != null
+                              ? FileImage(_profileImage!)
+                              : const AssetImage("assets/images/avatar.png")
+                                  as ImageProvider,
                       backgroundColor: Colors.grey,
                     ),
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.edit, color: Colors.black, size: 16),
+                    GestureDetector(
+                      onTap: _pickImage,
+                      child: CircleAvatar(
+                        radius: 14,
+                        backgroundColor: Colors.white,
+                        child: Icon(Icons.edit, color: Colors.black, size: 16),
+                      ),
                     ),
                   ],
                 ),
@@ -120,11 +178,51 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
 
             // Jenis Kelamin
             buildLabel("Jenis Kelamin"),
-            buildTextField(_genderController),
+            DropdownButtonFormField<String>(
+              value: _genderController.text,
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.grey, width: 1.0),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 16,
+                ),
+                isDense: true,
+                filled: true,
+                fillColor: Colors.white,
+              ),
+              dropdownColor: Colors.white,
+              style: const TextStyle(color: Colors.black, fontSize: 16),
+              icon: const Icon(Icons.arrow_drop_down, color: Colors.grey),
+              iconSize: 24,
+              items:
+                  ["Laki-laki", "Perempuan"]
+                      .map(
+                        (gender) => DropdownMenuItem<String>(
+                          value: gender,
+                          child: Text(gender),
+                        ),
+                      )
+                      .toList(),
+              onChanged: (value) {
+                setState(() {
+                  _genderController.text = value!;
+                });
+              },
+            ),
 
             // Tanggal Lahir
             buildLabel("Tanggal Lahir"),
-            buildTextField(_dobController),
+            TextFormField(
+              controller: _dobController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                suffixIcon: Icon(Icons.calendar_today),
+              ),
+              readOnly: true,
+              onTap: () => _selectDate(context),
+            ),
 
             const SizedBox(height: 24),
 
@@ -138,7 +236,7 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF0072CE),
+                  backgroundColor: const Color(0xFF0072CE),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 105.5,
                     vertical: 19,
@@ -194,7 +292,10 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
   Widget buildTextField(TextEditingController controller) {
     return TextFormField(
       controller: controller,
-      decoration: const InputDecoration(border: OutlineInputBorder()),
+      decoration: const InputDecoration(
+        border: OutlineInputBorder(),
+        contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 16),
+      ),
     );
   }
 }
