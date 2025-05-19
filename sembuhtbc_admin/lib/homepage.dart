@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'manage_med.dart';
-import 'profile_admin.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
