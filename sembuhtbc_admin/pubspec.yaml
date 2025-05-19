@@ -5,7 +5,7 @@ publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.7.0
+  sdk: ">=3.7.0 <4.0.0"
 
 dependencies:
   flutter:
@@ -15,22 +15,25 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   # Package untuk memilih gambar dari galeri/kamera
-  image_picker: ^1.0.4
+  image_picker: ^1.1.0 # Diupdate ke versi terbaru
 
   # Package untuk permission handling
-  permission_handler: ^10.4.0
+  permission_handler: ^10.4.4 # Diupdate ke versi terbaru
 
-  # Package untuk state management (opsional)
+  # Package untuk state management
   provider: ^6.1.1
 
-  # Package untuk HTTP requests (opsional)
+  # Package untuk HTTP requests
   http: ^1.1.0
 
-  # Package untuk shared preferences (opsional)
+  # Package untuk shared preferences
   shared_preferences: ^2.2.2
 
-  # Package untuk validasi form (opsional)
+  # Package untuk validasi form
   form_field_validator: ^1.1.0
+
+  # Package tambahan untuk kompatibilitas
+  flutter_plugin_android_lifecycle: ^2.0.7 # Ditambahkan untuk mendukung lifecycle
 
 dev_dependencies:
   flutter_test:
