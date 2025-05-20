@@ -4,7 +4,7 @@ import 'package:sembuhtbc_admin/welcome_admin_screen.dart';
 import 'package:sembuhtbc_admin/login_screen.dart';
 import 'package:sembuhtbc_admin/homepage.dart';
 import 'package:sembuhtbc_admin/profile_admin.dart';
-import 'firebase_options.dart';
+//import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:developer' as devtools show log;
@@ -12,14 +12,14 @@ import 'dart:developer' as devtools show log;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    devtools.log('Firebase initialized successfully');
-  } catch (e) {
-    devtools.log('Error initializing Firebase: $e');
-  }
+  //  try {
+  //    await Firebase.initializeApp(
+  //      options: DefaultFirebaseOptions.currentPlatform,
+  //    );
+  //    devtools.log('Firebase initialized successfully');
+  //  } catch (e) {
+  //    devtools.log('Error initializing Firebase: $e');
+  //  }
 
   runApp(const MyApp());
 }

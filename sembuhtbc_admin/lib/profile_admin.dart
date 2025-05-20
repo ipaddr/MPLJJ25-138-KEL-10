@@ -27,6 +27,7 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
   );
 
   bool _isPasswordVisible = false;
+  bool _isEditMode = false;
   DateTime? _selectedDate;
   File? _profileImage;
 
@@ -55,6 +56,12 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
             "${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}";
       });
     }
+  }
+
+  void _toggleEditMode() {
+    setState(() {
+      _isEditMode = !_isEditMode;
+    });
   }
 
   @override
@@ -116,7 +123,7 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
                   alignment: Alignment.bottomRight,
                   children: [
                     CircleAvatar(
-                      radius: 50,
+                      radius: 70,
                       backgroundImage:
                           _profileImage != null
                               ? FileImage(_profileImage!)
@@ -124,140 +131,297 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
                                   as ImageProvider,
                       backgroundColor: Colors.grey,
                     ),
-                    GestureDetector(
-                      onTap: _pickImage,
-                      child: CircleAvatar(
-                        radius: 14,
-                        backgroundColor: Colors.white,
-                        child: Icon(Icons.edit, color: Colors.black, size: 16),
+                    if (_isEditMode)
+                      GestureDetector(
+                        onTap: _pickImage,
+                        child: CircleAvatar(
+                          radius: 14,
+                          backgroundColor: Colors.white,
+                          child: Icon(
+                            Icons.edit,
+                            color: Colors.black,
+                            size: 16,
+                          ),
+                        ),
                       ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 const Text(
                   "Sisil Hasibuan, S.Kep",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontFamily: 'Urbanist',
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                const Text("ID: ADM1234", style: TextStyle(color: Colors.grey)),
+                const Text(
+                  "ID: ADM1234",
+                  style: TextStyle(
+                    fontFamily: 'Urbanist',
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
               ],
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
 
             // Nama
             buildLabel("Nama"),
-            buildTextField(_nameController),
-
-            // Email
-            buildLabel("Email"),
-            buildTextField(_emailController),
-
-            // Sandi
-            buildLabel("Sandi"),
             TextFormField(
-              controller: _passwordController,
-              obscureText: !_isPasswordVisible,
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _isPasswordVisible
-                        ? Icons.visibility
-                        : Icons.visibility_off,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _isPasswordVisible = !_isPasswordVisible;
-                    });
-                  },
-                ),
+              controller: _nameController,
+              enabled: _isEditMode,
+              style: TextStyle(
+                fontFamily: 'Urbanist',
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: _isEditMode ? Colors.black : Colors.black,
               ),
-            ),
-            const SizedBox(height: 16),
-
-            // Jenis Kelamin
-            buildLabel("Jenis Kelamin"),
-            DropdownButtonFormField<String>(
-              value: _genderController.text,
               decoration: InputDecoration(
                 border: const OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.grey, width: 1.0),
+                  borderSide: BorderSide(color: Colors.black),
                 ),
+                filled: true,
+                fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 15,
                   vertical: 16,
                 ),
-                isDense: true,
+              ),
+            ),
+
+            // Email
+            buildLabel("Email"),
+            TextFormField(
+              controller: _emailController,
+              enabled: _isEditMode,
+              style: TextStyle(
+                fontFamily: 'Urbanist',
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: _isEditMode ? Colors.black : Colors.black,
+              ),
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.black),
+                ),
                 filled: true,
                 fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 16,
+                ),
               ),
-              dropdownColor: Colors.white,
-              style: const TextStyle(color: Colors.black, fontSize: 16),
-              icon: const Icon(Icons.arrow_drop_down, color: Colors.grey),
-              iconSize: 24,
-              items:
-                  ["Laki-laki", "Perempuan"]
-                      .map(
-                        (gender) => DropdownMenuItem<String>(
-                          value: gender,
-                          child: Text(gender),
+            ),
+
+            // Sandi
+            buildLabel("Sandi"),
+            _isEditMode
+                ? TextFormField(
+                  controller: _passwordController,
+                  obscureText: false, // Always show password in edit mode
+                  style: const TextStyle(
+                    fontFamily: 'Urbanist',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.black),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                )
+                : Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _passwordController,
+                        obscureText: !_isPasswordVisible,
+                        enabled: false,
+                        style: const TextStyle(
+                          fontFamily: 'Urbanist',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
                         ),
-                      )
-                      .toList(),
-              onChanged: (value) {
-                setState(() {
-                  _genderController.text = value!;
-                });
-              },
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.black),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: Icon(
+                        _isPasswordVisible
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                        color: Colors.black,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _isPasswordVisible = !_isPasswordVisible;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+
+            // Jenis Kelamin
+            buildLabel("Jenis Kelamin"),
+            AbsorbPointer(
+              absorbing:
+                  !_isEditMode, // Blocks all interactions when not in edit mode
+              child: DropdownButtonFormField<String>(
+                value: _genderController.text,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(
+                      color: _isEditMode ? Colors.black : Colors.grey,
+                      width: 1.0,
+                    ),
+                  ),
+
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 15,
+                    vertical: 16,
+                  ),
+                  isDense: true,
+                  filled: true,
+                  fillColor: _isEditMode ? Colors.white : Colors.white,
+                ),
+                dropdownColor: Colors.white,
+                style: TextStyle(
+                  fontFamily: 'Urbanist',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color:
+                      _isEditMode
+                          ? Colors.black
+                          : Colors
+                              .grey[600], // Darker grey for better readability
+                ),
+                icon: Icon(
+                  Icons.arrow_drop_down,
+                  color: _isEditMode ? Colors.grey : Colors.grey[400],
+                ),
+                iconSize: 24,
+                items:
+                    ["Laki-laki", "Perempuan"]
+                        .map(
+                          (gender) => DropdownMenuItem<String>(
+                            value: gender,
+                            child: Text(
+                              gender,
+                              style: const TextStyle(
+                                fontFamily: 'Urbanist',
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                onChanged:
+                    _isEditMode
+                        ? (value) {
+                          setState(() {
+                            _genderController.text = value!;
+                          });
+                        }
+                        : null,
+              ),
             ),
 
             // Tanggal Lahir
             buildLabel("Tanggal Lahir"),
-            TextFormField(
-              controller: _dobController,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                suffixIcon: Icon(Icons.calendar_today),
-              ),
-              readOnly: true,
-              onTap: () => _selectDate(context),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Tombol Simpan
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Perubahan disimpan")),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0072CE),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 105.5,
-                    vertical: 19,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+            AbsorbPointer(
+              absorbing:
+                  !_isEditMode, // Will block all interactions when not in edit mode
+              child: TextFormField(
+                controller: _dobController,
+                style: const TextStyle(
+                  fontFamily: 'Urbanist',
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
                 ),
-                child: const Text(
-                  "Simpan",
-                  style: TextStyle(
-                    fontFamily: 'Montserrat',
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  suffixIcon: Icon(
+                    Icons.calendar_today,
+                    color: _isEditMode ? Colors.grey : Colors.grey,
                   ),
+                  filled: true,
+                  fillColor: Colors.white,
                 ),
+                readOnly: true,
+                enableInteractiveSelection:
+                    _isEditMode, // Disable text selection when not in edit mode
+                onTap: _isEditMode ? () => _selectDate(context) : null,
               ),
             ),
+
+            if (_isEditMode) ...[
+              const SizedBox(height: 24),
+
+              // Tombol Simpan
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    _toggleEditMode();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Perubahan disimpan")),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0072CE),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 105.5,
+                      vertical: 19,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    "Simpan",
+                    style: TextStyle(
+                      fontFamily: 'Montserrat',
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
 
             const SizedBox(height: 16),
+
+            // Edit Profile Button
+            TextButton(
+              onPressed: _toggleEditMode,
+              child: Text(
+                _isEditMode ? "Batal Edit" : "Edit Profile",
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 16,
+                  color: _isEditMode ? Colors.grey : const Color(0xFF0072CE),
+                ),
+              ),
+            ),
 
             // Logout
             TextButton(
@@ -284,14 +448,26 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
       padding: const EdgeInsets.only(bottom: 6, top: 12),
       child: Align(
         alignment: Alignment.centerLeft,
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontFamily: 'Urbanist',
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
+          ),
+        ),
       ),
     );
   }
 
-  Widget buildTextField(TextEditingController controller) {
+  Widget buildTextField(
+    TextEditingController controller, {
+    bool isEditable = true,
+  }) {
     return TextFormField(
       controller: controller,
+      enabled: isEditable,
       decoration: const InputDecoration(
         border: OutlineInputBorder(),
         contentPadding: EdgeInsets.symmetric(horizontal: 15, vertical: 16),
