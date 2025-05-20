@@ -25,7 +25,7 @@ class HomePage extends StatelessWidget {
                       color: Colors.amber,
                     ),
                     onPressed: () {
-                      Navigator.pushReplacementNamed(context, '/verif');
+                      Navigator.pushReplacementNamed(context, '/verify');
                     },
                   ),
                   IconButton(

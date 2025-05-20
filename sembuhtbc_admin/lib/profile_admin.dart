@@ -423,6 +423,8 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
               ),
             ),
 
+            const SizedBox(height: 14),
+
             // Logout
             TextButton(
               onPressed: () {

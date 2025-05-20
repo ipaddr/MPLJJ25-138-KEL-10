@@ -5,9 +5,10 @@ import 'package:sembuhtbc_admin/login_screen.dart';
 import 'package:sembuhtbc_admin/homepage.dart';
 import 'package:sembuhtbc_admin/profile_admin.dart';
 //import 'firebase_options.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'dart:developer' as devtools show log;
+//import 'package:firebase_core/firebase_core.dart';
+//import 'package:firebase_auth/firebase_auth.dart';
+//import 'dart:developer' as devtools show log;
+import 'package:sembuhtbc_admin/verif_acc.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,6 +46,7 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const HomePage(),
         '/manage': (context) => const ManageMedPage(),
         '/profile': (context) => const ProfileAdminPage(),
+        '/verify': (context) => const VerifikasiPasienScreen(),
       },
     );
   }

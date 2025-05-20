@@ -73,6 +73,122 @@ class _ManageMedPageState extends State<ManageMedPage> {
     );
   }
 
+  Future<void> _showConfirmationDialog(BuildContext context) async {
+    return showDialog(
+      context: context,
+      builder:
+          (context) => Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Konfirmasi Verifikasi",
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0072CE),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Apakah Anda yakin ingin menyimpan jadwal obat untuk pasien dengan ID: ${_idController.text}?",
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text(
+                          "Batal",
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _saveMedication();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0072CE),
+                        ),
+                        child: const Text(
+                          "Simpan",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+    );
+  }
+
+  void _saveMedication() {
+    final timesPerDay = int.tryParse(_timesPerDayController.text) ?? 0;
+    final days = int.tryParse(_daysController.text) ?? 0;
+    final totalAmount = timesPerDay * days;
+
+    String medicineUnit = '';
+    switch (_selectedType) {
+      case 'Tablet':
+        medicineUnit = '$totalAmount x minum pil';
+        break;
+      case 'Kapsul':
+        medicineUnit = '$totalAmount x minum kapsul';
+        break;
+      case 'Sirup':
+        medicineUnit = '$totalAmount x sendok sirup';
+        break;
+      case 'Injeksi':
+        medicineUnit = '$totalAmount x suntikan';
+        break;
+      default:
+        medicineUnit = '$totalAmount x minum';
+    }
+
+    final interval =
+        _selectedInterval == "custom"
+            ? int.tryParse(_customInterval ?? "0") ?? 0
+            : int.tryParse(_selectedInterval ?? "0") ?? 0;
+
+    final doseTimes = _calculateDoseTimes(
+      _timeController.text,
+      timesPerDay,
+      interval,
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.green,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Jadwal obat berhasil disimpan",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Text("Total obat: $medicineUnit"),
+            if (doseTimes.isNotEmpty)
+              Text("Jadwal minum: ${doseTimes.join(', ')}"),
+          ],
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
   List<String> _calculateDoseTimes(
     String firstDose,
     int timesPerDay,
@@ -82,9 +198,18 @@ class _ManageMedPageState extends State<ManageMedPage> {
     if (firstDose.isEmpty) return doseTimes;
 
     try {
-      final timeParts = firstDose.split(':');
+      // Parse the time string correctly
+      final timeParts = firstDose.split(RegExp(r'[: ]'));
       int hour = int.parse(timeParts[0]);
       int minute = int.parse(timeParts[1]);
+      final period = timeParts[2].toLowerCase();
+
+      // Convert 12-hour format to 24-hour format
+      if (period == 'pm' && hour != 12) {
+        hour += 12;
+      } else if (period == 'am' && hour == 12) {
+        hour = 0;
+      }
 
       for (int i = 0; i < timesPerDay; i++) {
         doseTimes.add(
@@ -175,6 +300,8 @@ class _ManageMedPageState extends State<ManageMedPage> {
                   focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(color: Color(0xFF0072CE)),
                   ),
+                  filled: true,
+                  fillColor: Colors.white,
                 ),
                 validator:
                     (value) =>
@@ -202,6 +329,8 @@ class _ManageMedPageState extends State<ManageMedPage> {
                   focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(color: Color(0xFF0072CE)),
                   ),
+                  filled: true,
+                  fillColor: Colors.white,
                 ),
                 validator:
                     (value) =>
@@ -227,6 +356,8 @@ class _ManageMedPageState extends State<ManageMedPage> {
                   focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(color: Color(0xFF0072CE)),
                   ),
+                  filled: true,
+                  fillColor: Colors.white,
                 ),
                 value: _selectedType,
                 hint: const Text("Pilih Opsi"),
@@ -263,6 +394,8 @@ class _ManageMedPageState extends State<ManageMedPage> {
                   focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(color: Color(0xFF0072CE)),
                   ),
+                  filled: true,
+                  fillColor: Colors.white,
                 ),
                 validator:
                     (value) =>
@@ -291,6 +424,8 @@ class _ManageMedPageState extends State<ManageMedPage> {
                   focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(color: Color(0xFF0072CE)),
                   ),
+                  filled: true,
+                  fillColor: Colors.white,
                 ),
                 validator:
                     (value) =>
@@ -319,6 +454,8 @@ class _ManageMedPageState extends State<ManageMedPage> {
                   focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(color: Color(0xFF0072CE)),
                   ),
+                  filled: true,
+                  fillColor: Colors.white,
                 ),
                 readOnly: true,
                 onTap: () async {
@@ -364,6 +501,8 @@ class _ManageMedPageState extends State<ManageMedPage> {
                         focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(color: Color(0xFF0072CE)),
                         ),
+                        filled: true,
+                        fillColor: Colors.white,
                       ),
                       validator:
                           (value) =>
@@ -384,6 +523,8 @@ class _ManageMedPageState extends State<ManageMedPage> {
                         focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(color: Color(0xFF0072CE)),
                         ),
+                        filled: true,
+                        fillColor: Colors.white,
                       ),
                       hint: const Text("Interval Waktu"),
                       items: const [
@@ -445,6 +586,8 @@ class _ManageMedPageState extends State<ManageMedPage> {
                   focusedBorder: OutlineInputBorder(
                     borderSide: BorderSide(color: Color(0xFF0072CE)),
                   ),
+                  filled: true,
+                  fillColor: Colors.white,
                 ),
                 validator:
                     (value) =>
@@ -482,39 +625,7 @@ class _ManageMedPageState extends State<ManageMedPage> {
                 child: ElevatedButton(
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
-                      final timesPerDay =
-                          int.tryParse(_timesPerDayController.text) ?? 0;
-                      final days = int.tryParse(_daysController.text) ?? 0;
-                      final totalPills = timesPerDay * days;
-
-                      final interval =
-                          _selectedInterval == "custom"
-                              ? int.tryParse(_customInterval ?? "0") ?? 0
-                              : int.tryParse(_selectedInterval ?? "0") ?? 0;
-
-                      final doseTimes = _calculateDoseTimes(
-                        _timeController.text,
-                        timesPerDay,
-                        interval,
-                      );
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text("Jadwal obat berhasil disimpan"),
-                              Text(
-                                "Total obat: $totalPills ${_selectedType ?? 'pcs'}",
-                              ),
-                              if (doseTimes.isNotEmpty)
-                                Text("Jadwal minum: ${doseTimes.join(', ')}"),
-                            ],
-                          ),
-                          duration: const Duration(seconds: 4),
-                        ),
-                      );
+                      _showConfirmationDialog(context);
                     }
                   },
                   style: ElevatedButton.styleFrom(
