@@ -66,7 +66,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 child: const SizedBox(
                   width: double.infinity,
                   child: Center(
-                    child: Text('Daftar', style: TextStyle(fontSize: 16)),
+                    child: Text('Daftar', style: TextStyle(fontSize: 16, color: Colors.white)),
                   ),
                 ),
               ),
@@ -125,17 +125,14 @@ class _RegisterPageState extends State<RegisterPage> {
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide.none,
         ),
-        suffixIcon:
-            isPassword
-                ? IconButton(
-                  icon: Icon(
-                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                  ),
-                  onPressed:
-                      () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
-                )
-                : null,
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                ),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              )
+            : null,
       ),
     );
   }
@@ -148,11 +145,13 @@ class _RegisterPageState extends State<RegisterPage> {
         const SnackBar(content: Text('Harap isi semua data terlebih dahulu')),
       );
     } else {
-      // TODO: simpan data atau panggil API backend
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Akun berhasil dibuat!')));
-      Navigator.pop(context);
+      // TODO: simpan data ke Firebase atau backend (jika diperlukan)
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Akun berhasil dibuat!')),
+      );
+
+      // Navigasi langsung ke halaman utama
+      Navigator.pushReplacementNamed(context, '/home');
     }
   }
 
