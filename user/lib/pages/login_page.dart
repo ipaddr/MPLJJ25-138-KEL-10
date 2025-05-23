@@ -9,17 +9,33 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
   Future<void> _handleGoogleSignIn() async {
     final userCredential = await AuthService.signInWithGoogle();
 
     if (userCredential != null && context.mounted) {
-      Navigator.pushReplacementNamed(context, '/');
+      Navigator.pushReplacementNamed(context, '/home');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Login dengan Google gagal')),
       );
+    }
+  }
+
+  void _handleLogin() {
+    final email = _emailController.text;
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Email dan sandi harus diisi')),
+      );
+    } else {
+      // TODO: Tambahkan logika autentikasi
+      Navigator.pushReplacementNamed(context, '/home');
     }
   }
 
@@ -47,10 +63,12 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 30),
               TextField(
+                controller: _emailController,
                 decoration: _buildInputDecoration("Masukkan email Anda"),
               ),
               const SizedBox(height: 20),
               TextField(
+                controller: _passwordController,
                 obscureText: _obscurePassword,
                 decoration: _buildInputDecoration(
                   "Masukkan sandi Anda",
@@ -70,7 +88,9 @@ class _LoginPageState extends State<LoginPage> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/forgot-password');
+                  },
                   child: const Text(
                     'Lupa Sandi?',
                     style: TextStyle(color: Color(0xFF005EB8)),
@@ -79,11 +99,12 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 10),
               ElevatedButton(
-                onPressed: () {
-                  // TODO: Tambahkan login email & password di sini
-                },
+                onPressed: _handleLogin,
                 style: _buttonStyle(),
-                child: const Text('Login'),
+                child: const Text(
+                  'Login',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
               const SizedBox(height: 20),
               _buildDivider(),
