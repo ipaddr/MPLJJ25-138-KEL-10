@@ -177,7 +177,10 @@ class _ManageMedPageState extends State<ManageMedPage> {
           children: [
             const Text(
               "Jadwal obat berhasil disimpan",
-              style: TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Text("Total obat: $medicineUnit"),
             if (doseTimes.isNotEmpty)

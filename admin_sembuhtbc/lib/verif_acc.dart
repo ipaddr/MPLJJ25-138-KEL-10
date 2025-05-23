@@ -88,7 +88,10 @@ class _VerifikasiPasienScreenState extends State<VerifikasiPasienScreen> {
                           SnackBar(
                             content: Text(
                               "Verifikasi telah ${action == 'menerima' ? 'diterima' : 'ditolak'}",
-                              style: const TextStyle(fontFamily: 'Roboto'),
+                              style: const TextStyle(
+                                fontFamily: 'Roboto',
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             backgroundColor:
                                 action == 'menerima'

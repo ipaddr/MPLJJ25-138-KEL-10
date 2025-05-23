@@ -382,7 +382,16 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
                   onPressed: () {
                     _toggleEditMode();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Perubahan disimpan")),
+                      const SnackBar(
+                        backgroundColor: Colors.green,
+                        content: Text(
+                          "Perubahan disimpan",
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     );
                   },
                   style: ElevatedButton.styleFrom(
