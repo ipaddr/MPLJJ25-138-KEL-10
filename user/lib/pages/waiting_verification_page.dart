@@ -1,7 +1,26 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'verification_success_page.dart'; // pastikan import halaman tujuan
 
-class WaitingVerificationPage extends StatelessWidget {
+class WaitingVerificationPage extends StatefulWidget {
   const WaitingVerificationPage({super.key});
+
+  @override
+  State<WaitingVerificationPage> createState() => _WaitingVerificationPageState();
+}
+
+class _WaitingVerificationPageState extends State<WaitingVerificationPage> {
+  @override
+  void initState() {
+    super.initState();
+    // Navigasi otomatis setelah 2 detik
+    Future.delayed(const Duration(seconds: 2), () {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const VerificationSuccessPage()),
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

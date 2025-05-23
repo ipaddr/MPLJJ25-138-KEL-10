@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'profile_user.dart';
 import 'reward_page.dart';
-import 'verification_warning_page.dart'; // halaman verifikasi
+import 'verification_warning_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -11,25 +11,27 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int takenMeds = 0; // jumlah obat yang sudah diminum
-
   final List<Medication> medications = [
     Medication(name: "Isoniazid", time: "09:41"),
     Medication(name: "Rifampicin", time: "09:44"),
   ];
 
-  void handleVerification() async {
+  void handleVerification(int index) async {
+    if (medications[index].isTaken) return;
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const VerificationWarningPage()),
     );
 
-    if (result == true && takenMeds < medications.length) {
+    if (result == true) {
       setState(() {
-        takenMeds++;
+        medications[index].isTaken = true;
       });
     }
   }
+
+  int get takenMeds => medications.where((m) => m.isTaken).length;
 
   @override
   Widget build(BuildContext context) {
@@ -39,19 +41,13 @@ class _HomePageState extends State<HomePage> {
         actions: [
           IconButton(
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ProfileUserPage()),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileUserPage()));
             },
             icon: const Icon(Icons.settings, color: Colors.black),
           ),
           IconButton(
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const RewardPage()),
-              );
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const RewardPage()));
             },
             icon: const Icon(Icons.emoji_emotions, color: Colors.amber),
           ),
@@ -68,12 +64,17 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 12),
             CircularProgressIndicatorWidget(progress: takenMeds),
             const SizedBox(height: 20),
-            ...medications.map(
-              (med) => MedicationItem(
-                name: med.name,
-                time: med.time,
-                onPressed: handleVerification,
-              ),
+            ...medications.asMap().entries.map(
+              (entry) {
+                final index = entry.key;
+                final med = entry.value;
+                return MedicationItem(
+                  name: med.name,
+                  time: med.time,
+                  isTaken: med.isTaken,
+                  onPressed: () => handleVerification(index),
+                );
+              },
             ),
           ],
         ),
@@ -85,8 +86,9 @@ class _HomePageState extends State<HomePage> {
 class Medication {
   final String name;
   final String time;
+  bool isTaken;
 
-  Medication({required this.name, required this.time});
+  Medication({required this.name, required this.time, this.isTaken = false});
 }
 
 class DaySelector extends StatefulWidget {
@@ -174,12 +176,14 @@ class CircularProgressIndicatorWidget extends StatelessWidget {
 class MedicationItem extends StatelessWidget {
   final String name;
   final String time;
+  final bool isTaken;
   final VoidCallback onPressed;
 
   const MedicationItem({
     super.key,
     required this.name,
     required this.time,
+    required this.isTaken,
     required this.onPressed,
   });
 
@@ -201,8 +205,11 @@ class MedicationItem extends StatelessWidget {
             Text(time, style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
             ElevatedButton(
-              onPressed: onPressed,
-              child: const Text("Minum"),
+              onPressed: isTaken ? null : onPressed,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isTaken ? Colors.grey : Colors.blue,
+              ),
+              child: Text(isTaken ? "Sudah" : "Minum"),
             ),
           ],
         ),

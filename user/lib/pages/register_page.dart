@@ -74,7 +74,9 @@ class _RegisterPageState extends State<RegisterPage> {
               _buildDivider(),
               const SizedBox(height: 20),
               OutlinedButton.icon(
-                onPressed: () {}, // TODO: daftar dengan Google
+                onPressed: () {
+                  Navigator.pushNamed(context, '/signin_google_page');
+                },
                 icon: Image.asset('assets/images/google_logo.png', height: 24),
                 label: const Text('Daftar dengan Google'),
                 style: OutlinedButton.styleFrom(
@@ -150,8 +152,8 @@ class _RegisterPageState extends State<RegisterPage> {
         const SnackBar(content: Text('Akun berhasil dibuat!')),
       );
 
-      // Navigasi langsung ke halaman utama
-      Navigator.pushReplacementNamed(context, '/home');
+      // Navigasi ke halaman waiting verification
+      Navigator.pushReplacementNamed(context, '/waiting-verification');
     }
   }
 

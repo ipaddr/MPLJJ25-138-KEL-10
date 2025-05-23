@@ -22,6 +22,7 @@ class GoogleSignInPage extends StatelessWidget {
         credential,
       );
 
+      // Tampilkan snackbar (opsional)
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -30,11 +31,14 @@ class GoogleSignInPage extends StatelessWidget {
         ),
       );
 
+      // Navigasi ke halaman waiting-verification
+      Navigator.pushReplacementNamed(context, '/waiting-verification');
+
       return userCredential;
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Gagal login: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Gagal login: $e")),
+      );
       return null;
     }
   }

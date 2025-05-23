@@ -1,7 +1,26 @@
 import 'package:flutter/material.dart';
 
-class VerificationSuccessPage extends StatelessWidget {
+class VerificationSuccessPage extends StatefulWidget {
   const VerificationSuccessPage({super.key});
+
+  @override
+  State<VerificationSuccessPage> createState() => _VerificationSuccessPageState();
+}
+
+class _VerificationSuccessPageState extends State<VerificationSuccessPage> {
+  @override
+  void initState() {
+    super.initState();
+
+    // Navigasi otomatis ke halaman login setelah 2 detik
+    Future.delayed(const Duration(seconds: 2), () {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/login',
+        (route) => false,
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
