@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'home_page.dart';
 
 class VerificationDonePage extends StatelessWidget {
   const VerificationDonePage({super.key});
@@ -25,7 +26,10 @@ class VerificationDonePage extends StatelessWidget {
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.pushReplacementNamed(context, '/home');
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const HomePage()),
+                    );
                   },
                   child: const Text('Kembali ke Beranda'),
                 )

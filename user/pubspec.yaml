@@ -14,6 +14,7 @@ dependencies:
   firebase_core: ^2.30.0
   firebase_auth: ^4.17.4
   google_sign_in: ^6.2.1
+  image_picker: ^1.0.7 # ✅ tambahkan ini
 
 dev_dependencies:
   flutter_test:
@@ -26,3 +27,4 @@ flutter:
   assets:
     - assets/images/clock_pill.png
     - assets/images/google_logo.png
+    - assets/images/selfie_blur.png

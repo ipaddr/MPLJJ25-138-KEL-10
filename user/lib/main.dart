@@ -10,15 +10,18 @@ import 'pages/verify_code_page.dart';
 import 'pages/new_password_page.dart';
 import 'pages/password_success_page.dart';
 import 'pages/home_page.dart';
+
+// Tambahkan import halaman verifikasi dan reward jika sudah dibuat
 import 'pages/verification_warning_page.dart';
 import 'pages/take_photo_page.dart';
 import 'pages/waiting_photo_page.dart';
 import 'pages/result_photo_page.dart';
 import 'pages/waiting_result_page.dart';
 import 'pages/verification_done_page.dart';
-import 'pages/reward_page.dart';
-import 'pages/reward_code_page.dart';
-import 'pages/reward_claimed_page.dart';
+/*import 'pages/RewardPage.dart';
+import 'pages/RewardCodePage.dart';
+import 'pages/RewardClaimedPage.dart';*/
+import 'pages/profile_user.dart';
 
 void main() {
   runApp(const MyApp());
@@ -55,9 +58,9 @@ class MyApp extends StatelessWidget {
         '/result-photo': (context) => const ResultPhotoPage(),
         '/waiting-result': (context) => const WaitingResultPage(),
         '/verif-done': (context) => const VerificationDonePage(),
-        '/reward': (context) => const RewardPage(),
+       /* '/reward': (context) => const RewardPage(),
         '/reward-code': (context) => const RewardCodePage(),
-        '/reward-claimed': (context) => const RewardClaimedPage(),
+        '/reward-claimed': (context) => const RewardClaimedPage(),*/
       },
     );
   }
