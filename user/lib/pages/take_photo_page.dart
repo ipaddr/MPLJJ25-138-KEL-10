@@ -13,7 +13,7 @@ class TakePhotoPage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset('assets/selfie_frame.png', height: 250),
+            Image.asset('assets/images/selfie_frame.png', height: 250),
             const SizedBox(height: 20),
             const Text(
               "Pegang smartphone dan sesuaikan posisi kamera dengan wajah Anda",

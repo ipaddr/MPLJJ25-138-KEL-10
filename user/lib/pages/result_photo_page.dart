@@ -19,7 +19,7 @@ class ResultPhotoPage extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset('assets/selfie_preview.png', height: 250),
+              Image.asset('assets/images/selfie_frame.png', height: 250),
               const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity,

@@ -12,7 +12,7 @@ class VerificationWarningPage extends StatelessWidget {
         padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
-            Image.asset('assets/selfie_warning.png', height: 200),
+            Image.asset('assets/images/selfie_frame.png', height: 200),
             const SizedBox(height: 20),
             const Text(
               'Perhatikan sebelum melakukan selfie!',

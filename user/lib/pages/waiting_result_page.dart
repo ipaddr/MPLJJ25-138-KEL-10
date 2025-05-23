@@ -26,7 +26,7 @@ class WaitingResultPage extends StatelessWidget {
                   Opacity(
                     opacity: 0.4,
                     child: Image.asset(
-                      'assets/selfie_blur.png',
+                      'assets/images/selfie_blur.png',
                       height: 300,
                     ),
                   ),
