@@ -7,12 +7,17 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:118240719864:android:afb999b76266f007f59c0d",
+        "mobilesdk_app_id": "1:118240719864:android:d7d06b0c99e23a67f59c0d",
         "android_client_info": {
-          "package_name": "com.example.user"
+          "package_name": "com.example.admin_sembuhtbc"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "118240719864-73i75lh4n51j1td6nlc3emjda89qhfd4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDqpYlDr8qt5p4abhAyUHalY2byBLGJCNw"
@@ -20,7 +25,99 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "118240719864-73i75lh4n51j1td6nlc3emjda89qhfd4.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "118240719864-8govdosgm9diicsvs74urpfab92qt3s1.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.adminSembuhtbc"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:118240719864:android:afb999b76266f007f59c0d",
+        "android_client_info": {
+          "package_name": "com.example.user"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "118240719864-73i75lh4n51j1td6nlc3emjda89qhfd4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqpYlDr8qt5p4abhAyUHalY2byBLGJCNw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "118240719864-73i75lh4n51j1td6nlc3emjda89qhfd4.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "118240719864-8govdosgm9diicsvs74urpfab92qt3s1.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.adminSembuhtbc"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:118240719864:android:1f784133fa072f31f59c0d",
+        "android_client_info": {
+          "package_name": "com.sembuhtbc"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "118240719864-8qi5mvbeqfnnteq998qa4kmmmtnq8b7h.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sembuhtbc",
+            "certificate_hash": "9fec2619cf9c6f9e9f375acf3b340a5b6d3fc215"
+          }
+        },
+        {
+          "client_id": "118240719864-73i75lh4n51j1td6nlc3emjda89qhfd4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqpYlDr8qt5p4abhAyUHalY2byBLGJCNw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "118240719864-73i75lh4n51j1td6nlc3emjda89qhfd4.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "118240719864-8govdosgm9diicsvs74urpfab92qt3s1.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.adminSembuhtbc"
+              }
+            }
+          ]
         }
       }
     }

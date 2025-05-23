@@ -64,6 +64,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '118240719864',
     projectId: 'sembuhtbcuser',
     storageBucket: 'sembuhtbcuser.firebasestorage.app',
+    androidClientId: '118240719864-8qi5mvbeqfnnteq998qa4kmmmtnq8b7h.apps.googleusercontent.com',
+    iosClientId: '118240719864-8m6k4iijro8aukbtr9jpjhuhds9ccmqa.apps.googleusercontent.com',
     iosBundleId: 'com.example.user',
   );
 
@@ -73,6 +75,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '118240719864',
     projectId: 'sembuhtbcuser',
     storageBucket: 'sembuhtbcuser.firebasestorage.app',
+    androidClientId: '118240719864-8qi5mvbeqfnnteq998qa4kmmmtnq8b7h.apps.googleusercontent.com',
+    iosClientId: '118240719864-8m6k4iijro8aukbtr9jpjhuhds9ccmqa.apps.googleusercontent.com',
     iosBundleId: 'com.example.user',
   );
 
@@ -85,4 +89,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'sembuhtbcuser.firebasestorage.app',
     measurementId: 'G-ZCCJGFLBXG',
   );
+
 }

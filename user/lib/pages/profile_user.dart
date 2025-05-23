@@ -80,7 +80,7 @@ class _ProfileUserPageState extends State<ProfileUserPage> {
         ),
         elevation: 0,
         title: const Text(
-          'Profil Admin',
+          'Profil',
           style: TextStyle(
             fontFamily: 'Montserrat',
             fontSize: 24,
@@ -117,7 +117,7 @@ class _ProfileUserPageState extends State<ProfileUserPage> {
               ],
             ),
             const SizedBox(height: 12),
-            const Text("Sisil Hasibuan, S.Kep",
+            const Text("Erna Suriana",
                 style: TextStyle(
                     fontFamily: 'Urbanist',
                     fontSize: 24,

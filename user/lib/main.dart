@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 // Autentikasi dan halaman awal
 import 'pages/welcome_page.dart';
@@ -24,11 +26,15 @@ import 'pages/waiting_photo_page.dart';
 import 'pages/result_photo_page.dart';
 import 'pages/waiting_result_page.dart';
 
-// Reward (mengikuti nama file yg kamu pakai: kapital di tengah)
+// Reward
 import 'pages/Reward_Page.dart';
 import 'pages/Reward_Code_Page.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MyApp());
 }
 
@@ -46,6 +52,7 @@ class MyApp extends StatelessWidget {
       ),
       initialRoute: '/',
       routes: {
+        // Autentikasi
         '/': (context) => const WelcomePage(),
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
@@ -54,8 +61,12 @@ class MyApp extends StatelessWidget {
         '/verify-code': (context) => const VerifyCodePage(),
         '/new-password': (context) => const NewPasswordPage(),
         '/password-success': (context) => const PasswordSuccessPage(),
+
+        // Home & Profil
         '/home': (context) => const HomePage(),
         '/profile': (context) => const ProfileUserPage(),
+
+        // Verifikasi & Foto
         '/verification-warning': (context) => const VerificationWarningPage(),
         '/waiting-verification': (context) => const WaitingVerificationPage(),
         '/verification-success': (context) => const VerificationSuccessPage(),
@@ -64,6 +75,8 @@ class MyApp extends StatelessWidget {
         '/waiting-photo': (context) => const WaitingPhotoPage(),
         '/result-photo': (context) => const ResultPhotoPage(),
         '/waiting-result': (context) => const WaitingResultPage(),
+
+        // Reward
         '/reward': (context) => const RewardPage(),
         '/reward-code': (context) => const RewardCodePage(),
       },
