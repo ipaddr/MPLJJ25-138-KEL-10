@@ -16,7 +16,7 @@ dependencies:
 
   firebase_core: ^3.13.1
   firebase_auth: ^5.5.4
-  cloud_firestore: 5.6.5
+  cloud_firestore: ^5.6.8
   #firebase_analytics: ^11.4.4
 
   # Package untuk memilih gambar dari galeri/kamera
@@ -36,6 +36,7 @@ dependencies:
 
   # Package tambahan untuk kompatibilitas
   flutter_plugin_android_lifecycle: ^2.0.7 # Ditambahkan untuk mendukung lifecycle
+  firebase_storage: ^12.4.6
 
 dev_dependencies:
   flutter_test:
