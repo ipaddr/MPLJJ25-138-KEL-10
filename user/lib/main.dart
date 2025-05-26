@@ -6,7 +6,6 @@ import 'firebase_options.dart';
 import 'pages/welcome_page.dart';
 import 'pages/login_page.dart';
 import 'pages/register_page.dart';
-import 'pages/google_signin_page.dart';
 import 'pages/forgot_password_page.dart';
 import 'pages/verify_code_page.dart';
 import 'pages/new_password_page.dart';
@@ -56,7 +55,6 @@ class MyApp extends StatelessWidget {
         '/': (context) => const WelcomePage(),
         '/login': (context) => const LoginPage(),
         '/register': (context) => const RegisterPage(),
-        '/signin-google': (context) => const GoogleSignInPage(),
         '/forgot-password': (context) => const ForgotPasswordPage(),
         '/verify-code': (context) => const VerifyCodePage(),
         '/new-password': (context) => const NewPasswordPage(),
