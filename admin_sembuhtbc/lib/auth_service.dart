@@ -42,12 +42,46 @@ class AuthService {
     required String profilePictureUrl,
   }) async {
     try {
-      await _firestore.collection('admins').doc(uid).update({
-        'username': username,
-        'gender': gender,
-        'birthDate': birthDate.toIso8601String(),
-        'profilePictureUrl': profilePictureUrl,
-      });
+      final adminRef = _firestore.collection('admins').doc(uid);
+      final doc = await adminRef.get();
+
+      if (!doc.exists) {
+        // Jika dokumen tidak ada, buat baru
+        await adminRef.set({
+          'username': username,
+          'gender': gender,
+          'birthDate': birthDate.toIso8601String(),
+          'profilePictureUrl': profilePictureUrl,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        // Jika dokumen ada, lakukan update
+        await adminRef.update({
+          'username': username,
+          'gender': gender,
+          'birthDate': birthDate.toIso8601String(),
+          'profilePictureUrl': profilePictureUrl,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> createAdminProfileIfNotExists(String uid, String email) async {
+    try {
+      final doc = await _firestore.collection('admins').doc(uid).get();
+      if (!doc.exists) {
+        await _firestore.collection('admins').doc(uid).set({
+          'email': email,
+          'username': email.split('@').first,
+          'gender': 'Perempuan',
+          'birthDate': DateTime(2000, 1, 1).toIso8601String(),
+          'profilePictureUrl': '',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
     } catch (e) {
       rethrow;
     }
