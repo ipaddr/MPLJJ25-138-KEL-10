@@ -25,7 +25,8 @@ flutter:
 
   assets:
     - assets/images/clock_pill.png
-    - assets/images/google_logo.png
     - assets/images/selfie_blur.png
     - assets/images/selfie_frame.png
+    - assets/images/selfie_issue.png 
     - assets/images/voucher.png
+    - assets/images/pill.png

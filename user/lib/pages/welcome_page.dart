@@ -49,12 +49,16 @@ class WelcomePage extends StatelessWidget {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white, // ✅ Warna teks putih
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: const Text('Login', style: TextStyle(fontSize: 16)),
+                    child: const Text(
+                      'Login',
+                      style: TextStyle(fontSize: 16, color: Colors.white), // ✅ Tambahkan warna putih juga di sini
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),

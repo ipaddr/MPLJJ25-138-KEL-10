@@ -1,19 +1,47 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'result_photo_page.dart';
 
-class WaitingPhotoPage extends StatelessWidget {
+class WaitingPhotoPage extends StatefulWidget {
   const WaitingPhotoPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Navigasi otomatis ke ResultPhotoPage setelah 2 detik
-    Future.delayed(const Duration(seconds: 2), () {
+  State<WaitingPhotoPage> createState() => _WaitingPhotoPageState();
+}
+
+class _WaitingPhotoPageState extends State<WaitingPhotoPage>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Timer _timer;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Navigasi otomatis ke ResultPhotoPage
+    _timer = Timer(const Duration(seconds: 2), () {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const ResultPhotoPage()),
       );
     });
 
+    // Untuk animasi titik-titik (opsional jika ingin bergerak)
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _timer.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -26,23 +54,31 @@ class WaitingPhotoPage extends StatelessWidget {
                 children: [
                   Opacity(
                     opacity: 0.4,
-                    child: Image.asset(
-                      'assets/images/selfie_blur.png',
-                      height: 300,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: Image.asset(
+                        'assets/images/selfie_blur.png',
+                        height: 320,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
-                  const FaceDots(),
+                  const FaceDots(), // Titik-titik di wajah
                 ],
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 32.0),
                 child: Text(
-                  'Pegang smartphone dan sesuaikan posisi kamera dengan wajah Anda',
+                  'Pegang smartphone\n'
+                  'dan sesuaikan posisi\n'
+                  'kamera dengan wajah Anda',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
-                    color: Colors.black54,
+                    color: Colors.black45,
+                    fontWeight: FontWeight.w400,
+                    height: 1.4,
                   ),
                 ),
               ),
@@ -80,8 +116,8 @@ class FaceDots extends StatelessWidget {
       top: top,
       left: left,
       child: Container(
-        width: 10,
-        height: 10,
+        width: 12,
+        height: 12,
         decoration: const BoxDecoration(
           color: Colors.black,
           shape: BoxShape.circle,
