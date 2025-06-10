@@ -13,8 +13,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   firebase_core: ^2.30.0
   firebase_auth: ^4.17.4
-  google_sign_in: ^6.2.1
-  image_picker: ^1.0.7 # ✅ tambahkan ini
+  cloud_firestore: ^4.15.6
+  fluttertoast: ^8.2.4
+  image_picker: ^1.0.7 
 
 dev_dependencies:
   flutter_test:
@@ -26,7 +27,8 @@ flutter:
 
   assets:
     - assets/images/clock_pill.png
-    - assets/images/google_logo.png
     - assets/images/selfie_blur.png
     - assets/images/selfie_frame.png
+    - assets/images/selfie_issue.png 
     - assets/images/voucher.png
+    - assets/images/pill.png

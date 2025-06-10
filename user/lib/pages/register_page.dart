@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:user/services/auth_service.dart'; // pastikan path sesuai
+import 'package:firebase_auth/firebase_auth.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -12,6 +14,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +58,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _handleRegister,
+                onPressed: _isLoading ? null : _handleRegister,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF005EB8),
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -63,28 +66,16 @@ class _RegisterPageState extends State<RegisterPage> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const SizedBox(
-                  width: double.infinity,
-                  child: Center(
-                    child: Text('Daftar', style: TextStyle(fontSize: 16, color: Colors.white)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              _buildDivider(),
-              const SizedBox(height: 20),
-              OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pushNamed(context, '/signin_google_page');
-                },
-                icon: Image.asset('assets/images/google_logo.png', height: 24),
-                label: const Text('Daftar dengan Google'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const SizedBox(
+                        width: double.infinity,
+                        child: Center(
+                          child: Text('Daftar',
+                              style:
+                                  TextStyle(fontSize: 16, color: Colors.white)),
+                        ),
+                      ),
               ),
               const Spacer(),
               Row(
@@ -132,41 +123,41 @@ class _RegisterPageState extends State<RegisterPage> {
                 icon: Icon(
                   _obscurePassword ? Icons.visibility_off : Icons.visibility,
                 ),
-                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
               )
             : null,
       ),
     );
   }
 
-  void _handleRegister() {
-    if (_nameController.text.isEmpty ||
-        _emailController.text.isEmpty ||
-        _passwordController.text.isEmpty) {
+  void _handleRegister() async {
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Harap isi semua data terlebih dahulu')),
       );
-    } else {
-      // TODO: simpan data ke Firebase atau backend (jika diperlukan)
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Akun berhasil dibuat!')),
-      );
-
-      // Navigasi ke halaman waiting verification
-      Navigator.pushReplacementNamed(context, '/waiting-verification');
+      return;
     }
-  }
 
-  Widget _buildDivider() {
-    return Row(
-      children: const [
-        Expanded(child: Divider()),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8),
-          child: Text('atau'),
-        ),
-        Expanded(child: Divider()),
-      ],
-    );
+    setState(() => _isLoading = true);
+
+    final userCredential =
+        await AuthService.registerWithEmail(email, password);
+
+    setState(() => _isLoading = false);
+
+    if (userCredential != null) {
+      if (context.mounted) {
+        Navigator.pushReplacementNamed(context, '/waiting-verification');
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Registrasi gagal. Coba lagi.')),
+      );
+    }
   }
 }

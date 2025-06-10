@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:user/services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -12,30 +13,33 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
 
-  Future<void> _handleGoogleSignIn() async {
-    final userCredential = await AuthService.signInWithGoogle();
-
-    if (userCredential != null && context.mounted) {
-      Navigator.pushReplacementNamed(context, '/home');
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login dengan Google gagal')),
-      );
-    }
-  }
-
-  void _handleLogin() {
-    final email = _emailController.text;
+  void _handleLogin() async {
+    final email = _emailController.text.trim();
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Email dan sandi harus diisi')),
       );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final userCredential = await AuthService.signInWithEmail(email, password);
+
+    setState(() => _isLoading = false);
+
+    if (userCredential != null) {
+      if (context.mounted) {
+        Navigator.pushReplacementNamed(context, '/home');
+      }
     } else {
-      // TODO: Tambahkan logika autentikasi
-      Navigator.pushReplacementNamed(context, '/home');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Login gagal. Cek email dan sandi Anda')),
+      );
     }
   }
 
@@ -99,21 +103,16 @@ class _LoginPageState extends State<LoginPage> {
               ),
               const SizedBox(height: 10),
               ElevatedButton(
-                onPressed: _handleLogin,
+                onPressed: _isLoading ? null : _handleLogin,
                 style: _buttonStyle(),
-                child: const Text(
-                  'Login',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-              const SizedBox(height: 20),
-              _buildDivider(),
-              const SizedBox(height: 20),
-              OutlinedButton.icon(
-                onPressed: _handleGoogleSignIn,
-                icon: Image.asset('assets/images/google_logo.png', height: 24),
-                label: const Text('Lanjut dengan Google'),
-                style: _outlineButtonStyle(),
+                child: _isLoading
+                    ? const CircularProgressIndicator(
+                        color: Colors.white,
+                      )
+                    : const Text(
+                        'Login',
+                        style: TextStyle(color: Colors.white),
+                      ),
               ),
               const Spacer(),
               Row(
@@ -157,26 +156,6 @@ class _LoginPageState extends State<LoginPage> {
       backgroundColor: const Color(0xFF005EB8),
       padding: const EdgeInsets.symmetric(vertical: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    );
-  }
-
-  ButtonStyle _outlineButtonStyle() {
-    return OutlinedButton.styleFrom(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    );
-  }
-
-  Widget _buildDivider() {
-    return Row(
-      children: const [
-        Expanded(child: Divider()),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8),
-          child: Text('atau'),
-        ),
-        Expanded(child: Divider()),
-      ],
     );
   }
 }

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'waiting_result_page.dart'; // Tambahkan ini
+import 'waiting_result_page.dart';
 
 class ResultPhotoPage extends StatelessWidget {
   const ResultPhotoPage({super.key});
@@ -19,7 +19,7 @@ class ResultPhotoPage extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset('assets/images/selfie_frame.png', height: 250),
+              Image.asset('assets/images/selfie_issue.png', height: 250),
               const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity,
@@ -42,21 +42,25 @@ class ResultPhotoPage extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.blue),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  child: const Text(
-                    'Ulangi',
-                    style: TextStyle(fontSize: 16, color: Colors.blue),
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/login');
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white, // ✅ Warna teks putih
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'ulangi',
+                      style: TextStyle(fontSize: 16, color: Colors.white), // ✅ Tambahkan warna putih juga di sini
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
