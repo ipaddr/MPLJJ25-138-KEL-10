@@ -39,7 +39,7 @@ class AuthService {
     required String username,
     required String gender,
     required DateTime birthDate,
-    required String profilePictureUrl,
+    String? profilePictureBase64, // Ganti dari profilePictureUrl
   }) async {
     try {
       final adminRef = _firestore.collection('admins').doc(uid);
@@ -51,7 +51,7 @@ class AuthService {
           'username': username,
           'gender': gender,
           'birthDate': birthDate.toIso8601String(),
-          'profilePictureUrl': profilePictureUrl,
+          'profilePictureBase64': profilePictureBase64, // Simpan sebagai base64
           'createdAt': FieldValue.serverTimestamp(),
         });
       } else {
@@ -60,7 +60,7 @@ class AuthService {
           'username': username,
           'gender': gender,
           'birthDate': birthDate.toIso8601String(),
-          'profilePictureUrl': profilePictureUrl,
+          'profilePictureBase64': profilePictureBase64, // Update field base64
           'updatedAt': FieldValue.serverTimestamp(),
         });
       }
@@ -78,7 +78,7 @@ class AuthService {
           'username': email.split('@').first,
           'gender': 'Perempuan',
           'birthDate': DateTime(2000, 1, 1).toIso8601String(),
-          'profilePictureUrl': '',
+          'profilePictureBase64': '', // Defaultkan sebagai string kosong
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
