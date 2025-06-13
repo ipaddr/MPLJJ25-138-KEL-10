@@ -15,17 +15,23 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+  final _formKey = GlobalKey<FormState>();
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+  }
 
   void _handleLogin() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-
-    if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Email dan sandi harus diisi')),
+    if (!_formKey.currentState!.validate()) {
+      _showSnackBar(
+        message: 'Harap perbaiki input yang salah',
+        backgroundColor: Colors.red,
       );
       return;
     }
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
 
     setState(() => _isLoading = true);
 
@@ -38,7 +44,8 @@ class _LoginPageState extends State<LoginPage> {
       }
 
       final uid = user.uid;
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final userDoc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
 
       if (!userDoc.exists) {
         throw Exception('User tidak ditemukan di Firestore.');
@@ -47,132 +54,307 @@ class _LoginPageState extends State<LoginPage> {
       final isVerified = userDoc.data()?['isVerified'] == true;
 
       if (!isVerified) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Akun Anda belum diverifikasi oleh admin')),
+        _showSnackBar(
+          message: 'Akun Anda belum diverifikasi oleh admin',
+          backgroundColor: Colors.orange,
         );
       } else {
-        // SUKSES LOGIN
         if (context.mounted) {
           Navigator.pushReplacementNamed(context, '/home');
         }
       }
     } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login gagal: ${e.message}')),
+      _showSnackBar(
+        message: 'Login gagal: ${_handleFirebaseError(e)}',
+        backgroundColor: Colors.red,
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login error: $e')),
-      );
+      _showSnackBar(message: 'Login error: $e', backgroundColor: Colors.red);
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => Navigator.pop(context),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                "Selamat datang kembali!",
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF005EB8),
-                ),
-              ),
-              const SizedBox(height: 30),
-              TextField(
-                controller: _emailController,
-                decoration: _buildInputDecoration("Masukkan email Anda"),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                decoration: _buildInputDecoration("Masukkan sandi Anda").copyWith(
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                    ),
-                    onPressed: () {
-                      setState(() => _obscurePassword = !_obscurePassword);
-                    },
-                  ),
-                ),
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/forgot-password');
-                  },
-                  child: const Text(
-                    'Lupa Sandi?',
-                    style: TextStyle(color: Color(0xFF005EB8)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _handleLogin,
-                style: _buttonStyle(),
-                child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Login', style: TextStyle(color: Colors.white)),
-              ),
-              const Spacer(),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text("Belum memiliki akun? "),
-                  GestureDetector(
-                    onTap: () => Navigator.pushNamed(context, '/register'),
-                    child: const Text(
-                      "Daftar",
-                      style: TextStyle(
-                        color: Color(0xFF005EB8),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-            ],
+  String _handleFirebaseError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-email':
+        return 'Format email tidak valid';
+      case 'user-disabled':
+        return 'Akun ini dinonaktifkan';
+      case 'user-not-found':
+        return 'Email tidak terdaftar';
+      case 'wrong-password':
+        return 'Password salah';
+      case 'too-many-requests':
+        return 'Terlalu banyak percobaan gagal. Coba lagi nanti';
+      case 'network-request-failed':
+        return 'Gagal terhubung ke jaringan';
+      case 'invalid-credential':
+        return 'Email atau password salah';
+      default:
+        return 'Terjadi kesalahan: ${e.message ?? 'Silakan coba lagi'}';
+    }
+  }
+
+  void _showSnackBar({
+    required String message,
+    required Color backgroundColor,
+    int durationSeconds = 3,
+  }) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontFamily: 'Urbanist',
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
           ),
+        ),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: Duration(seconds: durationSeconds),
+        action: SnackBarAction(
+          label: 'Tutup',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
         ),
       ),
     );
   }
 
-  InputDecoration _buildInputDecoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      filled: true,
-      fillColor: Colors.grey[200],
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide.none,
+  Widget _buildBackButton() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: TextButton(
+          style: TextButton.styleFrom(
+            backgroundColor: Colors.white,
+            padding: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: BorderSide(color: Colors.grey.shade300, width: 1),
+            ),
+          ),
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            }
+          },
+          child: const Icon(Icons.arrow_back, size: 24, color: Colors.black),
+        ),
       ),
     );
   }
 
-  ButtonStyle _buttonStyle() {
-    return ElevatedButton.styleFrom(
-      backgroundColor: const Color(0xFF005EB8),
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+  Widget _buildWelcomeText() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Selamat datang kembali!',
+          style: TextStyle(
+            fontFamily: 'Urbanist',
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0072CE),
+          ),
+        ),
+        const Text(
+          'Senang melihat Anda lagi!',
+          style: TextStyle(
+            fontFamily: 'Urbanist',
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0072CE),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmailField() {
+    return SizedBox(
+      width: 327,
+      child: TextFormField(
+        controller: _emailController,
+        keyboardType: TextInputType.emailAddress,
+        style: const TextStyle(fontFamily: 'Urbanist', fontSize: 15),
+        decoration: InputDecoration(
+          labelText: 'Masukkan email Anda',
+          labelStyle: const TextStyle(
+            fontFamily: 'Urbanist',
+            color: Color.fromARGB(255, 128, 128, 128),
+          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 16,
+            horizontal: 16,
+          ),
+        ),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Email harus diisi';
+          }
+          if (!_isValidEmail(value)) {
+            return 'Masukkan email yang valid';
+          }
+          return null;
+        },
+      ),
+    );
+  }
+
+  Widget _buildPasswordField() {
+    return SizedBox(
+      width: 327,
+      child: TextFormField(
+        controller: _passwordController,
+        obscureText: _obscurePassword,
+        style: const TextStyle(fontFamily: 'Urbanist', fontSize: 15),
+        decoration: InputDecoration(
+          labelText: 'Masukkan sandi Anda',
+          labelStyle: const TextStyle(
+            fontFamily: 'Urbanist',
+            color: Color.fromARGB(255, 128, 128, 128),
+          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          suffixIcon: IconButton(
+            icon: Icon(
+              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+              color: Colors.grey,
+            ),
+            onPressed: () {
+              setState(() => _obscurePassword = !_obscurePassword);
+            },
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 16,
+            horizontal: 16,
+          ),
+        ),
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Password harus diisi';
+          }
+          if (value.length < 6) {
+            return 'Password minimal 6 karakter';
+          }
+          return null;
+        },
+      ),
+    );
+  }
+
+  Widget _buildLoginButton() {
+    return SizedBox(
+      width: 327,
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _handleLogin,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF0072CE),
+          padding: const EdgeInsets.symmetric(horizontal: 105.5, vertical: 19),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        child:
+            _isLoading
+                ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+                : const Text(
+                  'Login',
+                  style: TextStyle(
+                    fontFamily: 'Urbanist',
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
+                ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white, // Tambahkan baris ini
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              children: [
+                const SizedBox(height: 20),
+                _buildBackButton(),
+                const SizedBox(height: 20),
+                _buildWelcomeText(),
+                const SizedBox(height: 30),
+                _buildEmailField(),
+                const SizedBox(height: 20),
+                _buildPasswordField(),
+                const SizedBox(height: 20),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/forgot-password');
+                    },
+                    child: const Text(
+                      'Lupa Sandi?',
+                      style: TextStyle(
+                        fontFamily: 'Urbanist',
+                        color: Color(0xFF0072CE),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _buildLoginButton(),
+                const SizedBox(height: 40),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      "Belum memiliki akun?",
+                      style: TextStyle(fontFamily: 'Urbanist'),
+                    ),
+                    const SizedBox(width: 5),
+                    GestureDetector(
+                      onTap: () => Navigator.pushNamed(context, '/register'),
+                      child: const Text(
+                        "Daftar",
+                        style: TextStyle(
+                          fontFamily: 'Urbanist',
+                          color: Color(0xFF0072CE),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
