@@ -1,18 +1,18 @@
-// Path: waiting_photo_page.dart
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'result_photo_page.dart'; // Halaman hasil foto
+import 'dart:io';
+import 'result_photo_page.dart';
 
 class WaitingPhotoPage extends StatefulWidget {
   final String scheduleId;
   final String doseTime;
-  // final String? imagePath; // Jika foto dari kamera perlu diproses di sini
+  final String imagePath; // Tambahkan imagePath agar preview bisa ditampilkan
 
   const WaitingPhotoPage({
     super.key,
     required this.scheduleId,
     required this.doseTime,
-    // this.imagePath,
+    required this.imagePath,
   });
 
   @override
@@ -22,8 +22,7 @@ class WaitingPhotoPage extends StatefulWidget {
 class _WaitingPhotoPageState extends State<WaitingPhotoPage>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  // Timer tidak lagi digunakan untuk navigasi, StreamBuilder di TakePhotoPage yang handle
-  bool _isVerificationSuccessful = false; // Hasil dari simulasi verifikasi
+  bool _isVerificationSuccessful = false;
 
   @override
   void initState() {
@@ -31,35 +30,31 @@ class _WaitingPhotoPageState extends State<WaitingPhotoPage>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2), // Durasi animasi dots
+      duration: const Duration(seconds: 2),
     )..repeat();
 
-    _performFaceVerification(); // Memulai proses verifikasi wajah
+    _performFaceVerification();
   }
 
   Future<void> _performFaceVerification() async {
-    // Simulasi proses deteksi wajah (misal, ML Kit)
-    await Future.delayed(const Duration(seconds: 3)); // Simulasi waktu proses
+    await Future.delayed(const Duration(seconds: 3));
 
-    // Logika simulasi hasil verifikasi:
-    // Contoh: 80% kemungkinan berhasil, 20% kemungkinan gagal
     final bool simulatedResult =
-        DateTime.now().millisecond % 10 < 8; // Random success/fail
+        DateTime.now().millisecond % 10 < 8; // 80% berhasil
 
     if (mounted) {
       setState(() {
         _isVerificationSuccessful = simulatedResult;
       });
-      // Navigasi ke ResultPhotoPage dengan hasil verifikasi
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder:
-              (_) => ResultPhotoPage(
-                scheduleId: widget.scheduleId,
-                doseTime: widget.doseTime,
-                isPhotoVerified: _isVerificationSuccessful,
-              ),
+          builder: (_) => ResultPhotoPage(
+            scheduleId: widget.scheduleId,
+            doseTime: widget.doseTime,
+            isPhotoVerified: _isVerificationSuccessful,
+          ),
         ),
       );
     }
@@ -68,7 +63,6 @@ class _WaitingPhotoPageState extends State<WaitingPhotoPage>
   @override
   void dispose() {
     _controller.dispose();
-    // _timer.cancel(); // Timer sudah dihapus
     super.dispose();
   }
 
@@ -88,25 +82,25 @@ class _WaitingPhotoPageState extends State<WaitingPhotoPage>
                     opacity: 0.4,
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(24),
-                      child: Image.asset(
-                        'assets/images/selfie_blur.png', // Gambar blur selfie
+                      child: Image.file(
+                        File(widget.imagePath),
                         height: 320,
+                        width: 240,
                         fit: BoxFit.cover,
                       ),
                     ),
                   ),
-                  const FaceDots(), // Titik-titik di wajah
+                  const FaceDots(),
                 ],
               ),
               const SizedBox(height: 24),
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 32.0),
                 child: Text(
-                  'Memverifikasi foto Anda...\n'
-                  'Mohon tunggu sebentar', // Pesan disesuaikan
+                  'Memverifikasi foto Anda...\nMohon tunggu sebentar',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontFamily: 'Roboto', // Font konsisten
+                    fontFamily: 'Roboto',
                     fontSize: 16,
                     color: Colors.black45,
                     fontWeight: FontWeight.w400,
@@ -115,11 +109,10 @@ class _WaitingPhotoPageState extends State<WaitingPhotoPage>
                 ),
               ),
               const SizedBox(height: 20),
-              // Tambahkan indikator loading jika perlu
               const CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(
                   Color(0xFF0072CE),
-                ), // Warna konsisten
+                ),
                 strokeWidth: 3,
               ),
             ],
@@ -130,7 +123,6 @@ class _WaitingPhotoPageState extends State<WaitingPhotoPage>
   }
 }
 
-// FaceDots tetap sama
 class FaceDots extends StatelessWidget {
   const FaceDots({super.key});
 
