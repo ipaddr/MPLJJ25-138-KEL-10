@@ -106,30 +106,23 @@ class AuthService {
 
   // ============== FUNGSI UNTUK VERIFIKASI AKUN PASIEN (DIJALANKAN OLEH ADMIN) ==============
 
-  // Mendapatkan daftar user dengan 'isVerified: false'
   Stream<List<Map<String, dynamic>>> getPendingUsers() {
     return _firestore
         .collection('users')
-        .where('isVerified', isEqualTo: false) // Menggunakan 'isVerified'
+        .where('isVerified', isEqualTo: false)
         .snapshots()
         .map(
           (snapshot) =>
               snapshot.docs
-                  .map(
-                    (doc) => {
-                      ...doc.data(),
-                      'uid': doc.id, // Menambahkan UID dari document ID
-                    },
-                  )
+                  .map((doc) => {...doc.data(), 'uid': doc.id})
                   .toList(),
         );
   }
 
-  // Mengubah status user menjadi 'isVerified: true'
   Future<void> verifyUser(String uid) async {
     try {
       await _firestore.collection('users').doc(uid).update({
-        'isVerified': true, // Mengubah 'isVerified' menjadi true
+        'isVerified': true,
         'verifiedAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
@@ -138,16 +131,141 @@ class AuthService {
     }
   }
 
-  // Menghapus user dari Firestore (untuk penolakan)
   Future<void> deleteUser(String uid) async {
     try {
       await _firestore.collection('users').doc(uid).delete();
-      // Perhatikan: Menghapus akun Firebase Auth dari sisi client untuk user lain sangat tidak disarankan
-      // dan hampir tidak mungkin tanpa Admin SDK atau otentikasi ulang yang rumit.
-      // Cukup hapus data di Firestore saja jika memang ingin user tersebut tidak terdaftar di aplikasi.
     } catch (e) {
       print("Error deleting user: $e");
       rethrow;
     }
+  }
+
+  // ============== FUNGSI BARU UNTUK MANAJEMEN OBAT OLEH ADMIN ==============
+
+  // Mendapatkan daftar user yang sudah diverifikasi (untuk dipilih admin)
+  Stream<List<Map<String, dynamic>>> getVerifiedUsers() {
+    return _firestore
+        .collection('users')
+        .where('isVerified', isEqualTo: true)
+        .snapshots()
+        .map(
+          (snapshot) =>
+              snapshot.docs
+                  .map(
+                    (doc) => {
+                      'uid': doc.id,
+                      'username': doc['username'],
+                      'email': doc['email'],
+                    },
+                  )
+                  .toList(),
+        );
+  }
+
+  // Menyimpan jadwal obat ke sub-koleksi 'medication_schedules' user
+  Future<void> addMedicationSchedule({
+    required String pasienUid,
+    required String medicineName,
+    required String medicineType,
+    required String dose,
+    required int amount,
+    required String firstDoseTime, // format "HH:MM AM/PM" atau "HH:MM" (24h)
+    required int timesPerDay,
+    required int intervalHours,
+    required int daysDuration,
+    required bool alarmEnabled,
+    required String assignedByAdminId,
+  }) async {
+    try {
+      // Menghasilkan daftar waktu minum berdasarkan firstDoseTime, timesPerDay, dan intervalHours
+      List<String> scheduledTimes = _calculateDoseTimes(
+        firstDoseTime,
+        timesPerDay,
+        intervalHours,
+      );
+
+      await _firestore
+          .collection('users')
+          .doc(pasienUid)
+          .collection('medication_schedules')
+          .add({
+            'medicineName': medicineName,
+            'medicineType': medicineType,
+            'dose': dose,
+            'amount': amount,
+            'firstDoseTime': firstDoseTime,
+            'timesPerDay': timesPerDay,
+            'intervalHours': intervalHours,
+            'daysDuration': daysDuration,
+            'alarmEnabled': alarmEnabled,
+            'assignedByAdminId': assignedByAdminId,
+            'assignedAt': FieldValue.serverTimestamp(),
+            'scheduledTimes': scheduledTimes, // Simpan daftar waktu terjadwal
+            'isActive': true, // menandakan jadwal aktif
+            'startDate': DateTime.now().toIso8601String().substring(
+              0,
+              10,
+            ), // Tanggal mulai hari ini
+            'endDate': DateTime.now()
+                .add(Duration(days: daysDuration - 1))
+                .toIso8601String()
+                .substring(0, 10), // Tanggal berakhir
+          });
+    } catch (e) {
+      print("Error adding medication schedule: $e"); // Menggunakan print
+      rethrow;
+    }
+  }
+
+  // Helper untuk menghitung waktu dosis (dipindahkan dari manage_med.dart agar bisa diakses di sini)
+  List<String> _calculateDoseTimes(
+    String firstDose,
+    int timesPerDay,
+    int intervalHours,
+  ) {
+    List<String> doseTimes = [];
+    if (firstDose.isEmpty) return doseTimes;
+
+    try {
+      int hour;
+      int minute;
+
+      // Coba parse 12-hour format "HH:MM AM/PM"
+      if (firstDose.contains("AM") || firstDose.contains("PM")) {
+        final timeParts = firstDose.split(RegExp(r'[: ]'));
+        hour = int.parse(timeParts[0]);
+        minute = int.parse(timeParts[1]);
+        final period = timeParts[2].toLowerCase();
+
+        if (period == 'pm' && hour != 12) {
+          hour += 12;
+        } else if (period == 'am' && hour == 12) {
+          hour = 0;
+        }
+      } else {
+        // Asumsi format 24-hour "HH:MM"
+        final timeParts = firstDose.split(':');
+        hour = int.parse(timeParts[0]);
+        minute = int.parse(timeParts[1]);
+      }
+
+      for (int i = 0; i < timesPerDay; i++) {
+        // Handle minute overflow when calculating next hour, then adjust hour
+        int currentHour = hour + (minute + i * intervalHours * 60) ~/ 60;
+        int currentMinute = (minute + i * intervalHours * 60) % 60;
+
+        currentHour = currentHour % 24; // Ensure hour stays within 0-23
+
+        doseTimes.add(
+          "${currentHour.toString().padLeft(2, '0')}:${currentMinute.toString().padLeft(2, '0')}",
+        );
+      }
+    } catch (e) {
+      print(
+        "Error calculating dose times in AuthService: $e",
+      ); // Menggunakan print
+    }
+    return doseTimes.toSet().toList()
+      ..sort(); // Urutkan dan hapus duplikat jika ada
   }
 }
