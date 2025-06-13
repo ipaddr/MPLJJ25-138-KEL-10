@@ -1,5 +1,5 @@
 // Path: user/services/auth_service.dart
-import 'dart:math'; // Sudah ada
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -20,10 +20,10 @@ class AuthService {
       );
     } on FirebaseAuthException catch (e) {
       print('Login error [${e.code}]: ${e.message}');
-      rethrow; // Re-throw to be caught by UI for specific error messages
+      rethrow;
     } catch (e) {
       print('Unexpected login error: $e');
-      rethrow; // Re-throw for general errors
+      rethrow;
     }
   }
 
@@ -52,7 +52,7 @@ class AuthService {
       // Simpan data user ke Firestore setelah berhasil daftar di Firebase Auth
       await _firestore.collection('users').doc(credential.user!.uid).set({
         'email': email,
-        'username': username, // Simpan username
+        'username': username,
         'gender': 'unknown', // Default, bisa disesuaikan di UI register user
         'birthDate':
             DateTime(2000, 1, 1).toIso8601String(), // Default, bisa disesuaikan
@@ -62,10 +62,6 @@ class AuthService {
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(), // Initial update timestamp
       });
-
-      // Email verification link is generally handled by the admin in this setup,
-      // so sending email verification may not be strictly necessary, but can be kept.
-      // await credential.user?.sendEmailVerification();
 
       return credential;
     } on FirebaseAuthException catch (e) {
@@ -80,17 +76,26 @@ class AuthService {
   // Mendapatkan user saat ini
   static User? getCurrentUser() => _auth.currentUser;
 
-  // Cek verifikasi email (tetap bisa digunakan oleh user untuk melihat status mereka)
+  // Cek verifikasi email
   static bool isEmailVerified() {
     final user = _auth.currentUser;
     return user?.emailVerified ?? false;
+  }
+
+  // ============== FUNGSI BARU UNTUK MEMANTAU STATUS VERIFIKASI DARI FIRESTORE ==============
+  static Stream<bool?> isUserVerifiedStream(String uid) {
+    return _firestore.collection('users').doc(uid).snapshots().map((snapshot) {
+      if (snapshot.exists) {
+        return snapshot.data()?['isVerified'] as bool?;
+      }
+      return null; // Mengembalikan null jika dokumen tidak ada (mungkin dihapus oleh admin)
+    });
   }
 
   // ====================
   // 🔐 RESET PASSWORD
   // ====================
 
-  // 1. Generate and send 4-digit code to email (using Firestore)
   static Future<bool> sendResetCode(String email) async {
     try {
       final code = (Random().nextInt(9000) + 1000).toString(); // 4-digit
@@ -103,9 +108,7 @@ class AuthService {
         ), // kadaluarsa 10 menit
       });
 
-      // Kirim kode via email (ini tetap perlu backend/cloud function untuk kirim email asli)
       print('Kode verifikasi untuk $email adalah: $code');
-
       return true;
     } catch (e) {
       print('Gagal mengirim kode reset: $e');
@@ -113,7 +116,6 @@ class AuthService {
     }
   }
 
-  // 2. Verifikasi kode yang dimasukkan user
   static Future<bool> verifyResetCode(String email, String inputCode) async {
     try {
       final doc = await _firestore.collection('reset_codes').doc(email).get();
@@ -132,10 +134,8 @@ class AuthService {
     }
   }
 
-  // 3. Reset password
   static Future<bool> resetPassword(String email, String newPassword) async {
     try {
-      // Firebase standard way to send password reset email (best practice)
       await _auth.sendPasswordResetEmail(email: email);
       print('Email reset password telah dikirim ke $email');
       return true;
@@ -148,7 +148,6 @@ class AuthService {
     }
   }
 
-  // Tambahan: Ambil status isVerified dari Firestore untuk user
   static Future<bool> isUserVerifiedInFirestore(String uid) async {
     try {
       DocumentSnapshot doc =
