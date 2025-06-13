@@ -156,14 +156,14 @@ class MyApp extends StatelessWidget {
           );
         },
         '/waiting-photo': (context) {
-          final args =
-              ModalRoute.of(context)!.settings.arguments
-                  as Map<String, dynamic>;
-          return WaitingPhotoPage(
-            scheduleId: args['scheduleId'] as String,
-            doseTime: args['doseTime'] as String,
-          );
-        },
+  final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+  return WaitingPhotoPage(
+    scheduleId: args['scheduleId'] as String,
+    doseTime: args['doseTime'] as String,
+    imagePath: args['imagePath'] as String, // ← TAMBAHKAN INI
+  );
+},
+
         '/result-photo': (context) {
           final args =
               ModalRoute.of(context)!.settings.arguments

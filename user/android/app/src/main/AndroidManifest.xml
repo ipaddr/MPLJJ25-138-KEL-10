@@ -1,18 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.user">
 
-    <!-- ✅ Tambahkan permission di luar <application> -->
-    <uses-permission android:name="android.permission.CAMERA"/>
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- ✅ Izin penggunaan kamera dan penyimpanan -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- ✅ Menyatakan aplikasi butuh kamera -->
+    <uses-feature android:name="android.hardware.camera.any" android:required="true" />
 
     <application
         android:label="user"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
-        
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -26,13 +29,15 @@
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
-                <meta-data
-                    android:name="com.google.firebase.messaging.default_notification_channel_id"
-                     android:value="your_channel_id"/>
-                
+
+            <!-- Firebase notification channel -->
+            <meta-data
+                android:name="com.google.firebase.messaging.default_notification_channel_id"
+                android:value="your_channel_id" />
+
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
@@ -42,11 +47,11 @@
             android:value="2" />
     </application>
 
-    <!-- Flutter plugin permission untuk text processor -->
+    <!-- Untuk mendukung intent proses teks -->
     <queries>
         <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT"/>
-            <data android:mimeType="text/plain"/>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
         </intent>
     </queries>
 </manifest>

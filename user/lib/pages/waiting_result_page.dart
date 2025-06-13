@@ -1,18 +1,31 @@
 import 'package:flutter/material.dart';
 import 'verification_done_page.dart';
 
-class WaitingResultPage extends StatelessWidget {
-  const WaitingResultPage({super.key});
+class WaitingResultPage extends StatefulWidget {
+  final String imagePath;
+
+  const WaitingResultPage({super.key, required this.imagePath});
+
+  @override
+  State<WaitingResultPage> createState() => _WaitingResultPageState();
+}
+
+class _WaitingResultPageState extends State<WaitingResultPage> {
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const VerificationDonePage()),
+        );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    Future.delayed(const Duration(seconds: 2), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const VerificationDonePage()),
-      );
-    });
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -20,14 +33,16 @@ class WaitingResultPage extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Ganti background dengan preview foto yang diambil
               Stack(
                 alignment: Alignment.center,
                 children: [
                   Opacity(
                     opacity: 0.4,
-                    child: Image.asset(
-                      'assets/images/selfie_blur.png',
+                    child: Image.file(
+                      File(widget.imagePath),
                       height: 300,
+                      fit: BoxFit.cover,
                     ),
                   ),
                   const FaceDots(),
@@ -38,6 +53,8 @@ class WaitingResultPage extends StatelessWidget {
                 'Memverifikasi foto...',
                 style: TextStyle(fontSize: 16),
               ),
+              const SizedBox(height: 16),
+              const CircularProgressIndicator(color: Color(0xFF0072CE)),
             ],
           ),
         ),
