@@ -1,18 +1,24 @@
-// App-level build.gradle.kts
+// Path: android/app/build.gradle.kts
 
 plugins {
     id("com.android.application")
-    // START: FlutterFire Configuration
-    id("com.google.gms.google-services")
-    // END: FlutterFire Configuration
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
+    // FlutterFire: Google Services plugin
+    id("com.google.gms.google-services") version "4.4.1" apply false
 }
 
 android {
     namespace = "com.example.user"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    compileSdk = 34 // Atau sesuai kebutuhan
+
+    defaultConfig {
+        applicationId = "com.example.user"
+        minSdk = 21 // Firebase butuh minSdk 21
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -20,20 +26,15 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
-    }
-
-    defaultConfig {
-        applicationId = "com.example.user"
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        jvmTarget = "11"
     }
 
     buildTypes {
         release {
+            // Jika belum punya release signingConfig, gunakan debug
             signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
@@ -42,5 +43,5 @@ flutter {
     source = "../.."
 }
 
-// Tambahkan plugin Google Services di bawah konfigurasi
-apply<com.google.gms.googleservices.GoogleServicesPlugin>()
+// Terapkan plugin Google Services setelah konfigurasi Android
+apply(plugin = "com.google.gms.google-services")
