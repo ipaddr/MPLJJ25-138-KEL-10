@@ -1,9 +1,19 @@
+// Path: waiting_photo_page.dart
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'result_photo_page.dart';
+import 'result_photo_page.dart'; // Halaman hasil foto
 
 class WaitingPhotoPage extends StatefulWidget {
-  const WaitingPhotoPage({super.key});
+  final String scheduleId;
+  final String doseTime;
+  // final String? imagePath; // Jika foto dari kamera perlu diproses di sini
+
+  const WaitingPhotoPage({
+    super.key,
+    required this.scheduleId,
+    required this.doseTime,
+    // this.imagePath,
+  });
 
   @override
   State<WaitingPhotoPage> createState() => _WaitingPhotoPageState();
@@ -12,31 +22,53 @@ class WaitingPhotoPage extends StatefulWidget {
 class _WaitingPhotoPageState extends State<WaitingPhotoPage>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Timer _timer;
+  // Timer tidak lagi digunakan untuk navigasi, StreamBuilder di TakePhotoPage yang handle
+  bool _isVerificationSuccessful = false; // Hasil dari simulasi verifikasi
 
   @override
   void initState() {
     super.initState();
 
-    // Navigasi otomatis ke ResultPhotoPage
-    _timer = Timer(const Duration(seconds: 2), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const ResultPhotoPage()),
-      );
-    });
-
-    // Untuk animasi titik-titik (opsional jika ingin bergerak)
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 2), // Durasi animasi dots
     )..repeat();
+
+    _performFaceVerification(); // Memulai proses verifikasi wajah
+  }
+
+  Future<void> _performFaceVerification() async {
+    // Simulasi proses deteksi wajah (misal, ML Kit)
+    await Future.delayed(const Duration(seconds: 3)); // Simulasi waktu proses
+
+    // Logika simulasi hasil verifikasi:
+    // Contoh: 80% kemungkinan berhasil, 20% kemungkinan gagal
+    final bool simulatedResult =
+        DateTime.now().millisecond % 10 < 8; // Random success/fail
+
+    if (mounted) {
+      setState(() {
+        _isVerificationSuccessful = simulatedResult;
+      });
+      // Navigasi ke ResultPhotoPage dengan hasil verifikasi
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder:
+              (_) => ResultPhotoPage(
+                scheduleId: widget.scheduleId,
+                doseTime: widget.doseTime,
+                isPhotoVerified: _isVerificationSuccessful,
+              ),
+        ),
+      );
+    }
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _timer.cancel();
+    // _timer.cancel(); // Timer sudah dihapus
     super.dispose();
   }
 
@@ -57,7 +89,7 @@ class _WaitingPhotoPageState extends State<WaitingPhotoPage>
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(24),
                       child: Image.asset(
-                        'assets/images/selfie_blur.png',
+                        'assets/images/selfie_blur.png', // Gambar blur selfie
                         height: 320,
                         fit: BoxFit.cover,
                       ),
@@ -70,17 +102,25 @@ class _WaitingPhotoPageState extends State<WaitingPhotoPage>
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 32.0),
                 child: Text(
-                  'Pegang smartphone\n'
-                  'dan sesuaikan posisi\n'
-                  'kamera dengan wajah Anda',
+                  'Memverifikasi foto Anda...\n'
+                  'Mohon tunggu sebentar', // Pesan disesuaikan
                   textAlign: TextAlign.center,
                   style: TextStyle(
+                    fontFamily: 'Roboto', // Font konsisten
                     fontSize: 16,
                     color: Colors.black45,
                     fontWeight: FontWeight.w400,
                     height: 1.4,
                   ),
                 ),
+              ),
+              const SizedBox(height: 20),
+              // Tambahkan indikator loading jika perlu
+              const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  Color(0xFF0072CE),
+                ), // Warna konsisten
+                strokeWidth: 3,
               ),
             ],
           ),
@@ -90,6 +130,7 @@ class _WaitingPhotoPageState extends State<WaitingPhotoPage>
   }
 }
 
+// FaceDots tetap sama
 class FaceDots extends StatelessWidget {
   const FaceDots({super.key});
 

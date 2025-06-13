@@ -1,20 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // Untuk mendapatkan nama hari
 import 'verification_warning_page.dart';
 
 class MedInfoPage extends StatelessWidget {
+  final String scheduleId; // ID Dokumen jadwal obat di Firestore
   final String name;
-  final String time;
-  final String dose; // ✅ Tambah parameter dosis
+  final String dose;
+  final String medicineType; // Tambahkan medicineType dari home_page
+  final String doseTime; // Waktu dosis spesifik yang perlu diverifikasi
 
   const MedInfoPage({
     super.key,
+    required this.scheduleId, // Pastikan ini diterima
     required this.name,
-    required this.time,
     required this.dose,
+    required this.medicineType, // Pastikan ini diterima
+    required this.doseTime, // Pastikan ini diterima
   });
 
   @override
   Widget build(BuildContext context) {
+    // Dapatkan nama hari ini
+    String dayName = DateFormat(
+      'EEEE',
+      'id_ID',
+    ).format(DateTime.now()); // Contoh: "Rabu"
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -44,15 +55,19 @@ class MedInfoPage extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
-                      boxShadow: [
+                      boxShadow: const [
                         BoxShadow(
                           color: Colors.black12,
                           blurRadius: 4,
                           offset: Offset(0, 2),
-                        )
+                        ),
                       ],
                     ),
-                    child: const Icon(Icons.info, color: Colors.amber, size: 16),
+                    child: const Icon(
+                      Icons.info,
+                      color: Colors.amber,
+                      size: 16,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -60,14 +75,14 @@ class MedInfoPage extends StatelessWidget {
                   "Sudah minum obat Anda?",
                   style: TextStyle(
                     fontSize: 18,
-                    color: Colors.blue,
+                    color: Color(0xFF0072CE), // Warna yang konsisten
                     fontWeight: FontWeight.w500,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 Image.asset(
-                  'assets/images/pill.png',
+                  'assets/images/pill.png', // Pastikan gambar ini ada
                   height: 60,
                 ),
                 const SizedBox(height: 16),
@@ -76,7 +91,7 @@ class MedInfoPage extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF007BCE),
+                    color: Color(0xFF0072CE), // Warna yang konsisten
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -85,14 +100,17 @@ class MedInfoPage extends StatelessWidget {
                 // Jadwal
                 Row(
                   children: [
-                    const Icon(Icons.calendar_today_outlined,
-                        size: 18, color: Color(0xFF007BCE)),
+                    const Icon(
+                      Icons.calendar_today_outlined,
+                      size: 18,
+                      color: Color(0xFF0072CE),
+                    ), // Warna konsisten
                     const SizedBox(width: 8),
                     Text(
-                      "Jadwal $time, Rabu",
+                      "Jadwal $doseTime, $dayName", // Menggunakan doseTime dan dayName
                       style: const TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF007BCE),
+                        color: Color(0xFF0072CE), // Warna konsisten
                       ),
                     ),
                   ],
@@ -102,14 +120,17 @@ class MedInfoPage extends StatelessWidget {
                 // Dosis
                 Row(
                   children: [
-                    const Icon(Icons.description_outlined,
-                        size: 18, color: Color(0xFF007BCE)),
+                    const Icon(
+                      Icons.description_outlined,
+                      size: 18,
+                      color: Color(0xFF0072CE),
+                    ), // Warna konsisten
                     const SizedBox(width: 8),
                     Text(
-                      dose,
+                      "$dose ($medicineType)", // Menampilkan dosis dan tipe obat
                       style: const TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF007BCE),
+                        color: Color(0xFF0072CE), // Warna konsisten
                       ),
                     ),
                   ],
@@ -120,17 +141,31 @@ class MedInfoPage extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
+                    onPressed: () async {
+                      // Meneruskan scheduleId dan doseTime ke VerificationWarningPage
+                      final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const VerificationWarningPage(),
+                          builder:
+                              (_) => VerificationWarningPage(
+                                scheduleId: scheduleId,
+                                doseTime: doseTime,
+                              ),
                         ),
                       );
+                      // Jika kembali dengan true, berarti verifikasi berhasil
+                      if (result == true) {
+                        Navigator.pop(
+                          context,
+                          true,
+                        ); // Kembali ke HomePage dengan true
+                      }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF007BCE),
-                      foregroundColor: Colors.white, // ✅ teks tombol putih
+                      backgroundColor: const Color(
+                        0xFF0072CE,
+                      ), // Warna konsisten
+                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -141,7 +176,7 @@ class MedInfoPage extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white, // ✅ pastikan ini juga putih
+                        color: Colors.white,
                       ),
                     ),
                   ),

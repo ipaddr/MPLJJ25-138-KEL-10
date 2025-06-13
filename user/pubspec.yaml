@@ -1,6 +1,6 @@
 name: user
 description: "A new Flutter project."
-publish_to: 'none'
+publish_to: "none"
 
 version: 1.0.0+1
 
@@ -15,9 +15,7 @@ dependencies:
   firebase_auth: ^4.17.4
   cloud_firestore: ^4.15.6
   fluttertoast: ^8.2.4
-  image_picker: ^1.0.7
-  flutter_local_notifications: ^17.0.0
-
+  image_picker: ^1.0.7 
 
 dev_dependencies:
   flutter_test:
@@ -31,6 +29,6 @@ flutter:
     - assets/images/clock_pill.png
     - assets/images/selfie_blur.png
     - assets/images/selfie_frame.png
-    - assets/images/selfie_issue.png 
+    - assets/images/selfie_issue.png
     - assets/images/voucher.png
     - assets/images/pill.png
