@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'auth_service.dart';
 import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data'; // Pastikan ini ada
 
 class ProfileAdminPage extends StatefulWidget {
   const ProfileAdminPage({super.key});
@@ -17,7 +17,7 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController(
-    text: "********",
+    text: "********", // Default text for password field
   );
   final TextEditingController _genderController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
@@ -25,10 +25,9 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
   bool _isPasswordVisible = false;
   bool _isEditMode = false;
   bool _isLoading = true;
-  bool _isUploading = false;
   DateTime? _selectedDate;
   File? _profileImage;
-  String? _profileImageUrl;
+  String? _profileImageBase64;
   String? _userId;
 
   @override
@@ -58,7 +57,8 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
               "${_selectedDate!.day.toString().padLeft(2, '0')}/${_selectedDate!.month.toString().padLeft(2, '0')}/${_selectedDate!.year}";
         }
 
-        _profileImageUrl = profileData['profilePictureUrl'];
+        _profileImageBase64 =
+            profileData['profilePictureBase64']; // Ambil base64 dari Firestore
       }
     }
 
@@ -90,50 +90,24 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
     }
   }
 
-  Future<String?> _uploadImage() async {
-    if (_profileImage == null) return _profileImageUrl;
-    if (_userId == null) return null;
+  Future<String?> _convertImageToBase64() async {
+    if (_profileImage == null)
+      return _profileImageBase64; // Jika tidak ada gambar baru, gunakan yang lama
 
     try {
-      setState(() {
-        _isUploading = true;
-      });
-
-      // Validasi file gambar
-      if (!await _profileImage!.exists()) {
-        throw Exception("File gambar tidak ditemukan");
-      }
-
-      // Buat reference ke Firebase Storage
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('profile_images')
-          .child('$_userId.jpg');
-
-      // Upload file dengan metadata
-      await storageRef.putFile(
-        _profileImage!,
-        SettableMetadata(contentType: 'image/jpeg'),
-      );
-
-      // Dapatkan download URL
-      String downloadUrl = await storageRef.getDownloadURL();
-      print('Berhasil upload gambar. URL: $downloadUrl');
-
-      return downloadUrl;
+      List<int> imageBytes = await _profileImage!.readAsBytes();
+      String base64Image = base64Encode(imageBytes);
+      print('Berhasil mengonversi gambar ke base64.');
+      return base64Image;
     } catch (e) {
-      print("Error uploading image: $e");
+      print("Error converting image to base64: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Gagal mengupload gambar: $e"),
+          content: Text("Gagal mengonversi gambar: $e"),
           backgroundColor: Colors.red,
         ),
       );
       return null;
-    } finally {
-      setState(() {
-        _isUploading = false;
-      });
     }
   }
 
@@ -160,6 +134,8 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
       if (!_isEditMode) {
         _profileImage = null;
       }
+      // Reset password visibility saat mode edit diubah
+      _isPasswordVisible = false;
     });
   }
 
@@ -173,23 +149,20 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
     });
 
     try {
-      // Upload gambar jika ada perubahan
-      String? newImageUrl = await _uploadImage();
-      String finalImageUrl = newImageUrl ?? _profileImageUrl ?? '';
+      String? newImageBase64 = await _convertImageToBase64();
+      String finalImageBase64 = newImageBase64 ?? _profileImageBase64 ?? '';
 
-      // Simpan ke Firestore
       await _authService.updateAdminProfile(
         uid: _userId!,
         username: _nameController.text,
         gender: _genderController.text,
         birthDate: _selectedDate!,
-        profilePictureUrl: finalImageUrl,
+        profilePictureBase64: finalImageBase64, // Kirim base64 ke AuthService
       );
 
-      // Update state
       setState(() {
-        _profileImageUrl = finalImageUrl;
-        _profileImage = null; // Reset image file setelah upload
+        _profileImageBase64 = finalImageBase64;
+        _profileImage = null; // Reset image file setelah konversi
         _isEditMode = false;
       });
 
@@ -214,6 +187,121 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
     }
   }
 
+  // Fungsi untuk menampilkan dialog konfirmasi logout
+  Future<void> _showLogoutConfirmation(BuildContext context) async {
+    return showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Konfirmasi Logout",
+                  style: TextStyle(
+                    fontFamily: 'Montserrat',
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0072CE),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "Apakah Anda yakin ingin logout dari akun?",
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 15,
+                    fontWeight: FontWeight.normal,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        "Batal",
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 14,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () async {
+                        Navigator.pop(context); // Close dialog first
+                        await _logout(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0072CE),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        "Logout",
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Fungsi untuk melakukan proses logout
+  Future<void> _logout(BuildContext context) async {
+    final authService = AuthService();
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    try {
+      await authService.signOut();
+      // Navigasi ke halaman login dan hapus semua rute sebelumnya
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/', // Asumsikan '/' adalah rute login Anda
+        (Route<dynamic> route) => false,
+      );
+    } catch (e) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Logout gagal: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -224,13 +312,41 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+        // Bagian leading yang diubah
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: TextButton(
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(color: Colors.grey[300]!, width: 1),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pushReplacementNamed(context, '/home');
+                },
+                child: const Icon(
+                  Icons.arrow_back,
+                  size: 24,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ),
         ),
         title: const Text(
           'Profil Admin',
           style: TextStyle(
+            fontFamily:
+                'Montserrat', // Pastikan font ini tersedia di project Anda
+            fontSize: 24,
             color: Color(0xFF0072CE),
             fontWeight: FontWeight.bold,
           ),
@@ -245,8 +361,6 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
             child: Column(
               children: [
                 const SizedBox(height: 20),
-
-                // Avatar & Nama
                 Column(
                   children: [
                     Stack(
@@ -289,18 +403,12 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 24),
-
-                // Form fields
                 _buildFormFields(),
-
                 const SizedBox(height: 20),
               ],
             ),
           ),
-
-          if (_isUploading) const Center(child: CircularProgressIndicator()),
         ],
       ),
     );
@@ -309,8 +417,14 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
   ImageProvider? _getProfileImage() {
     if (_profileImage != null) {
       return FileImage(_profileImage!);
-    } else if (_profileImageUrl != null && _profileImageUrl!.isNotEmpty) {
-      return NetworkImage(_profileImageUrl!);
+    } else if (_profileImageBase64 != null && _profileImageBase64!.isNotEmpty) {
+      try {
+        List<int> imageBytes = base64Decode(_profileImageBase64!);
+        return MemoryImage(Uint8List.fromList(imageBytes));
+      } catch (e) {
+        print("Error decoding base64 image: $e");
+        return const AssetImage("assets/images/avatar.png");
+      }
     }
     return const AssetImage("assets/images/avatar.png");
   }
@@ -329,8 +443,6 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
         const SizedBox(height: 16),
         _buildDateField(),
         const SizedBox(height: 24),
-
-        // Tombol Aksi
         _buildActionButtons(),
       ],
     );
@@ -374,6 +486,8 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
   }
 
   Widget _buildPasswordField() {
+    // Note: It's not possible to retrieve the actual plain text password from Firebase for security reasons.
+    // The password field will display "********" by default.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -382,27 +496,20 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
           style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
         ),
         const SizedBox(height: 6),
-        Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _passwordController,
-                obscureText: !_isPasswordVisible,
-                enabled: false,
-                style: const TextStyle(fontSize: 15, color: Colors.grey),
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 15,
-                    vertical: 16,
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                ),
-              ),
+        TextFormField(
+          controller: _passwordController,
+          obscureText: !_isPasswordVisible,
+          enabled: false, // Password field should remain disabled
+          style: const TextStyle(fontSize: 15, color: Colors.grey),
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 15,
+              vertical: 16,
             ),
-            const SizedBox(width: 8),
-            IconButton(
+            filled: true,
+            fillColor: Colors.white,
+            suffixIcon: IconButton(
               icon: Icon(
                 _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
                 color: Colors.grey,
@@ -410,10 +517,18 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
               onPressed: () {
                 setState(() {
                   _isPasswordVisible = !_isPasswordVisible;
+                  // If revealing, temporary clear the controller text to show nothing or allow input if enabled
+                  // But since it's disabled, it will just toggle obscurity of "********"
+                  if (_isPasswordVisible) {
+                    _passwordController.text =
+                        ""; // Clear to show empty or allow new input if enabled
+                  } else {
+                    _passwordController.text = "********"; // Revert to masked
+                  }
                 });
               },
             ),
-          ],
+          ),
         ),
       ],
     );
@@ -425,7 +540,11 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
       children: [
         const Text(
           "Jenis Kelamin",
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+          style: TextStyle(
+            fontFamily: 'Roboto',
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+          ),
         ),
         const SizedBox(height: 6),
         AbsorbPointer(
@@ -518,36 +637,83 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
               child: const Text(
                 "Simpan Perubahan",
                 style: TextStyle(
+                  fontFamily: 'Montserrat',
                   color: Colors.white,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
           ),
           const SizedBox(height: 12),
-        ],
-
-        TextButton(
-          onPressed: _toggleEditMode,
-          child: Text(
-            _isEditMode ? "Batal Edit" : "Edit Profil",
-            style: TextStyle(
-              color: _isEditMode ? Colors.grey : const Color(0xFF0072CE),
-              fontWeight: FontWeight.bold,
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _toggleEditMode,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey, // Abu-abu
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                "Batal Edit",
+                style: TextStyle(
+                  fontFamily: 'Montserrat',
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
-        ),
-
+        ] else ...[
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _toggleEditMode,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0072CE), // Biru
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: const Text(
+                "Edit Profil",
+                style: TextStyle(
+                  fontFamily: 'Montserrat',
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
-
-        TextButton(
-          onPressed: () {
-            _authService.signOut();
-            Navigator.pushReplacementNamed(context, '/login');
-          },
-          child: const Text(
-            "Keluar",
-            style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            // Memanggil dialog konfirmasi logout
+            onPressed: () => _showLogoutConfirmation(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red, // Merah
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              "Logout", // Teks tombol tetap "Logout"
+              style: TextStyle(
+                fontFamily: 'Montserrat',
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ),
       ],
