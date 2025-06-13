@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 
@@ -52,7 +51,7 @@ class AuthService {
       await _firestore.collection('users').doc(credential.user!.uid).set({
         'email': email,
         'username': username,
-        'gender': 'unknown',
+        'gender': 'Perempuan', // <-- PERUBAHAN UTAMA: Nilai default yang valid
         'birthDate': DateTime(2000, 1, 1).toIso8601String(),
         'isVerified': false,
         'profilePictureUrl': '',
@@ -169,13 +168,7 @@ class AuthService {
         .map(
           (snapshot) =>
               snapshot.docs
-                  .map(
-                    (doc) => {
-                      // Pastikan data dikonversi ke Map<String, dynamic> dengan aman
-                      ...doc.data() as Map<String, dynamic>,
-                      'id': doc.id,
-                    },
-                  )
+                  .map((doc) => {...doc.data(), 'id': doc.id})
                   .toList(),
         );
   }
@@ -226,8 +219,7 @@ class AuthService {
               .get();
 
       if (doc.exists && doc.data() != null) {
-        // Pastikan docData adalah Map<String, dynamic>
-        final Map<String, dynamic> docData = doc.data() as Map<String, dynamic>;
+        final Map<String, dynamic> docData = doc.data()!;
         if (docData['doses'] is Map) {
           return Map<String, bool>.from(docData['doses']!);
         }
@@ -341,8 +333,6 @@ class AuthService {
     );
   }
 
-  // ============== FUNGSI BARU UNTUK REWARD ==============
-
   static Stream<Map<String, dynamic>> getUserRewards(String userId) {
     return _firestore.collection('users').doc(userId).snapshots().map((
       snapshot,
@@ -353,6 +343,70 @@ class AuthService {
       }
       return {};
     });
+  }
+
+  Future<Map<String, dynamic>?> getUserProfile(String uid) async {
+    try {
+      DocumentSnapshot doc =
+          await _firestore.collection('users').doc(uid).get();
+      return doc.data() as Map<String, dynamic>?;
+    } catch (e) {
+      print("Error getting user profile: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> updateUserProfile({
+    required String uid,
+    required String username,
+    required String gender,
+    required DateTime birthDate,
+    required String profilePictureBase64,
+  }) async {
+    try {
+      final userRef = _firestore.collection('users').doc(uid);
+      final doc = await userRef.get();
+
+      if (!doc.exists) {
+        await userRef.set({
+          'username': username,
+          'gender': gender,
+          'birthDate': birthDate.toIso8601String(),
+          'profilePictureBase64': profilePictureBase64,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        await userRef.update({
+          'username': username,
+          'gender': gender,
+          'birthDate': birthDate.toIso8601String(),
+          'profilePictureBase64': profilePictureBase64,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      print("Error updating user profile: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> createUserProfileIfNotExists(String uid, String email) async {
+    try {
+      final doc = await _firestore.collection('users').doc(uid).get();
+      if (!doc.exists) {
+        await _firestore.collection('users').doc(uid).set({
+          'email': email,
+          'username': email.split('@').first,
+          'gender': 'Perempuan',
+          'birthDate': DateTime(2000, 1, 1).toIso8601String(),
+          'profilePictureBase64': '',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      print("Error creating user profile: $e");
+      rethrow;
+    }
   }
 
   static Future<void> updateRewardClaimStatus(
@@ -393,9 +447,7 @@ class AuthService {
 
     for (var scheduleDoc in schedulesSnapshot.docs) {
       final scheduleId = scheduleDoc.id;
-      // PERBAIKAN: Cast scheduleData ke Map<String, dynamic>
-      final Map<String, dynamic> scheduleData =
-          scheduleDoc.data() as Map<String, dynamic>;
+      final Map<String, dynamic> scheduleData = scheduleDoc.data();
       final List<String> scheduledTimes = List<String>.from(
         scheduleData['scheduledTimes'] ?? [],
       );
@@ -414,10 +466,9 @@ class AuthService {
           'yyyy-MM-dd',
         ).format(currentCheckDate);
 
-        // Only consider this schedule if it was active on currentCheckDate
         if (currentCheckDate.isAfter(scheduleEndDate) ||
             currentCheckDate.isBefore(scheduleStartDate)) {
-          continue; // Schedule not active on this day
+          continue;
         }
 
         final takenDosesDoc =
@@ -443,6 +494,7 @@ class AuthService {
         });
       }
     }
+
     return {'taken': takenDosesInPeriod, 'total': totalDosesInPeriod};
   }
 
@@ -460,13 +512,11 @@ class AuthService {
             .where('isActive', isEqualTo: true)
             .get();
 
-    // Track if there's any active schedule for the given date that *requires* doses
+    // ignore: unused_local_variable
     bool hasAnyDosesScheduledForDate = false;
 
     for (var scheduleDoc in schedulesSnapshot.docs) {
-      // PERBAIKAN: Cast scheduleData ke Map<String, dynamic>
-      final Map<String, dynamic> scheduleData =
-          scheduleDoc.data() as Map<String, dynamic>;
+      final Map<String, dynamic> scheduleData = scheduleDoc.data();
       final String scheduleStartDateStr =
           scheduleData['startDate'] as String? ?? '1970-01-01';
       final String scheduleEndDateStr =
@@ -475,23 +525,19 @@ class AuthService {
       final DateTime scheduleStartDate = DateTime.parse(scheduleStartDateStr);
       final DateTime scheduleEndDate = DateTime.parse(scheduleEndDateStr);
 
-      // Check if this schedule is active on the given date
       final DateTime dateAtMidnight = DateTime(date.year, date.month, date.day);
       if (dateAtMidnight.isBefore(scheduleStartDate) ||
           dateAtMidnight.isAfter(scheduleEndDate)) {
-        continue; // Schedule not active on this specific date
+        continue;
       }
 
       final List<String> scheduledTimes = List<String>.from(
         scheduleData['scheduledTimes'] ?? [],
       );
 
-      if (scheduledTimes.isEmpty) {
-        continue; // No doses scheduled for this specific schedule, so it doesn't prevent completion
-      }
+      if (scheduledTimes.isEmpty) continue;
 
-      hasAnyDosesScheduledForDate =
-          true; // Yes, there are doses scheduled for today
+      hasAnyDosesScheduledForDate = true;
 
       final takenDosesDoc =
           await _firestore
@@ -503,7 +549,6 @@ class AuthService {
               .doc(dateKey)
               .get();
 
-      // PERBAIKAN: Cast dosesStatus ke Map<String, bool>
       final Map<String, bool> dosesStatus =
           (takenDosesDoc.exists && takenDosesDoc.data() != null)
               ? Map<String, bool>.from(takenDosesDoc.data()!['doses'] ?? {})
@@ -511,14 +556,11 @@ class AuthService {
 
       for (String time in scheduledTimes) {
         if (dosesStatus[time] != true) {
-          return false; // Found an untaken dose for an active schedule on this date
+          return false;
         }
       }
     }
-    // If we reached here:
-    // 1. Either there were NO active schedules for the `date` (hasAnyDosesScheduledForDate is false) -> return true (day is "completed" because no doses were required)
-    // 2. Or there were active schedules for the `date` AND all of them were taken -> return true.
-    return true; // If no un-taken doses found, return true.
+    return true;
   }
 
   static Future<int> getConsecutiveDaysCompleted(String userId) async {
@@ -531,15 +573,7 @@ class AuthService {
       currentDate.day,
     );
 
-    // Check from today backwards
-    // For "consecutive days completed", typically we check for *fully completed days*.
-    // If today is not fully completed yet, it breaks the streak starting from today.
-    // If the streak is calculated for the most recent completed period,
-    // we should iterate backward.
-
-    // Iterasi mundur dari HARI INI
     for (int i = 0; i < 365; i++) {
-      // Max 365 days streak check
       final dateToCheck = currentDate.subtract(Duration(days: i));
       final bool allTakenOnThisDay = await areAllDosesTakenForDay(
         userId,
@@ -549,12 +583,10 @@ class AuthService {
       if (allTakenOnThisDay) {
         consecutiveDays++;
       } else {
-        // If today is NOT fully completed, the streak from today breaks.
-        // If it's a previous day that is NOT fully completed, the streak also breaks.
-        return consecutiveDays; // Return the streak found so far.
+        return consecutiveDays;
       }
     }
-    return consecutiveDays; // Return streak if it goes back 365 days
+    return consecutiveDays;
   }
 
   static Future<bool> hasCompletedConsecutiveDays(
@@ -575,36 +607,29 @@ class AuthService {
             .get();
 
     if (schedulesSnapshot.docs.isEmpty) {
-      return false; // No schedules, so cannot be completed
+      return false;
     }
 
     final DateTime now = DateTime.now();
     final DateTime todayAtMidnight = DateTime(now.year, now.month, now.day);
 
     for (var scheduleDoc in schedulesSnapshot.docs) {
-      // PERBAIKAN: Cast scheduleData ke Map<String, dynamic>
-      final Map<String, dynamic> scheduleData =
-          scheduleDoc.data() as Map<String, dynamic>;
+      final Map<String, dynamic> scheduleData = scheduleDoc.data();
       final String startDateStr =
           scheduleData['startDate'] as String? ?? '1970-01-01';
       final String endDateStr =
           scheduleData['endDate'] as String? ?? '2999-12-31';
-      final int timesPerDay = scheduleData['timesPerDay'] as int? ?? 1;
 
       final DateTime scheduleStartDate = DateTime.parse(startDateStr);
       final DateTime scheduleEndDate = DateTime.parse(endDateStr);
 
-      // Condition for "all medication" - the schedule must have already ended.
       if (scheduleEndDate.isAfter(todayAtMidnight)) {
-        // Use todayAtMidnight for comparison
-        // If the schedule is still ongoing or ends today, it's not "completed all medication" yet.
         return false;
       }
 
       int actualTakenDosesForThisSchedule = 0;
       int totalExpectedDosesForThisSchedule = 0;
 
-      // Iterate from schedule start date to schedule end date to count expected and taken doses
       for (
         DateTime d = scheduleStartDate;
         d.isBefore(scheduleEndDate.add(const Duration(days: 1)));
@@ -627,7 +652,6 @@ class AuthService {
                 .get();
 
         if (takenDosesDoc.exists && takenDosesDoc.data() != null) {
-          // PERBAIKAN: Cast dosesStatus ke Map<String, bool>
           final Map<String, bool> dosesStatus = Map<String, bool>.from(
             takenDosesDoc.data()!['doses'] ?? {},
           );
@@ -639,13 +663,11 @@ class AuthService {
         }
       }
 
-      // If for this specific *ended* schedule, taken doses don't match expected total, return false.
       if (actualTakenDosesForThisSchedule < totalExpectedDosesForThisSchedule) {
         return false;
       }
     }
-    // If all schedules have either not yet started or have ended AND all doses were taken, then true.
-    // Also, if there are no schedules, it should return false based on initial check.
+
     return true;
   }
 }
