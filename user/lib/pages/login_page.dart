@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:user/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -28,18 +29,43 @@ class _LoginPageState extends State<LoginPage> {
 
     setState(() => _isLoading = true);
 
-    final userCredential = await AuthService.signInWithEmail(email, password);
+    try {
+      final credential = await AuthService.signInWithEmail(email, password);
+      final user = credential?.user;
 
-    setState(() => _isLoading = false);
-
-    if (userCredential != null) {
-      if (context.mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
+      if (user == null) {
+        throw Exception('Gagal mendapatkan user.');
       }
-    } else {
+
+      final uid = user.uid;
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+      if (!userDoc.exists) {
+        throw Exception('User tidak ditemukan di Firestore.');
+      }
+
+      final isVerified = userDoc.data()?['isVerified'] == true;
+
+      if (!isVerified) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Akun Anda belum diverifikasi oleh admin')),
+        );
+      } else {
+        // SUKSES LOGIN
+        if (context.mounted) {
+          Navigator.pushReplacementNamed(context, '/home');
+        }
+      }
+    } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login gagal. Cek email dan sandi Anda')),
+        SnackBar(content: Text('Login gagal: ${e.message}')),
       );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login error: $e')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -74,14 +100,10 @@ class _LoginPageState extends State<LoginPage> {
               TextField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
-                decoration: _buildInputDecoration(
-                  "Masukkan sandi Anda",
-                ).copyWith(
+                decoration: _buildInputDecoration("Masukkan sandi Anda").copyWith(
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
                     ),
                     onPressed: () {
                       setState(() => _obscurePassword = !_obscurePassword);
@@ -106,13 +128,8 @@ class _LoginPageState extends State<LoginPage> {
                 onPressed: _isLoading ? null : _handleLogin,
                 style: _buttonStyle(),
                 child: _isLoading
-                    ? const CircularProgressIndicator(
-                        color: Colors.white,
-                      )
-                    : const Text(
-                        'Login',
-                        style: TextStyle(color: Colors.white),
-                      ),
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('Login', style: TextStyle(color: Colors.white)),
               ),
               const Spacer(),
               Row(

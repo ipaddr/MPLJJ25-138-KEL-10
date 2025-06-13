@@ -17,8 +17,17 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final args = ModalRoute.of(context)!.settings.arguments as Map;
-    email = args['email'];
+    final args = ModalRoute.of(context)?.settings.arguments;
+
+    if (args is Map<String, dynamic>) {
+      email = args['email'] ?? '';
+    } else {
+      email = '';
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Terjadi kesalahan: data tidak valid.')),
+      );
+      Navigator.pop(context); // Kembali ke halaman sebelumnya
+    }
   }
 
   @override
@@ -47,14 +56,9 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
     }
 
     try {
-      // Login dulu dengan email & kode verifikasi (sandi sementara) jika perlu
-      // Untuk demo ini kita asumsikan user berhasil login kembali
-      
-      User? user = FirebaseAuth.instance.currentUser;
+      final user = FirebaseAuth.instance.currentUser;
 
       if (user == null) {
-        // Bisa terjadi jika user belum login, misal dari reset via email
-        // Maka sebaiknya arahkan ke login dulu
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Silakan login kembali sebelum mengatur ulang sandi.')),
         );
@@ -62,7 +66,6 @@ class _NewPasswordPageState extends State<NewPasswordPage> {
         return;
       }
 
-      // Update password sekarang
       await user.updatePassword(password);
 
       ScaffoldMessenger.of(context).showSnackBar(
