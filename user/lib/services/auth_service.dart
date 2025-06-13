@@ -110,6 +110,21 @@ class AuthService {
     }
   }
 
+  static Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      // Firebase akan secara internal memeriksa apakah email ada
+      // dan mengirimkan link reset jika ada. Ini lebih aman.
+      await _auth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (e) {
+      // Lempar kembali exception dari Firebase agar bisa ditangani di UI
+      // dengan pesan yang lebih spesifik.
+      throw e;
+    } catch (e) {
+      // Menangani error tak terduga lainnya.
+      throw Exception('Terjadi kesalahan tidak terduga: ${e.toString()}');
+    }
+  }
+
   static Future<bool> verifyResetCode(String email, String inputCode) async {
     try {
       final doc = await _firestore.collection('reset_codes').doc(email).get();
