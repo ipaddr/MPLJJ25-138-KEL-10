@@ -6,9 +6,6 @@ class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // ============================================================
-  // 🔐 LOGIN
-  // ============================================================
   static Future<UserCredential?> signInWithEmail(String email, String password) async {
     try {
       final credential = await _auth.signInWithEmailAndPassword(
@@ -17,20 +14,10 @@ class AuthService {
       );
 
       final uid = credential.user?.uid;
-      if (uid == null) {
-        print('[AuthService] Gagal mendapatkan UID user.');
-        return null;
-      }
+      if (uid == null) return null;
 
       final userDoc = await _firestore.collection('users').doc(uid).get();
-      if (!userDoc.exists) {
-        print('[AuthService] Dokumen user tidak ditemukan di Firestore.');
-        return null;
-      }
-
-      final isVerified = userDoc.data()?['isVerified'] == true;
-      if (!isVerified) {
-        print('[AuthService] Akun belum diverifikasi oleh admin.');
+      if (!userDoc.exists || userDoc.data()?['isVerified'] != true) {
         return null;
       }
 
@@ -44,9 +31,6 @@ class AuthService {
     }
   }
 
-  // ============================================================
-  // 🚪 LOGOUT
-  // ============================================================
   static Future<void> signOut() async {
     try {
       await _auth.signOut();
@@ -56,10 +40,8 @@ class AuthService {
     }
   }
 
-  // ============================================================
-  // 📝 REGISTER
-  // ============================================================
-  static Future<UserCredential?> registerWithEmail(String email, String password) async {
+  // ✅ Fungsi ini sudah diperbaiki untuk menerima parameter `name`
+  static Future<UserCredential?> registerWithEmail(String email, String password, String name) async {
     try {
       final credential = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -70,6 +52,7 @@ class AuthService {
       if (uid != null) {
         await _firestore.collection('users').doc(uid).set({
           'email': email,
+          'name': name, // ✅ Simpan nama ke Firestore
           'username': '',
           'birthdate': null,
           'gender': '',
@@ -83,7 +66,6 @@ class AuthService {
       }
 
       await credential.user?.sendEmailVerification();
-
       return credential;
     } on FirebaseAuthException catch (e) {
       print('[AuthService] FirebaseAuthException [${e.code}]: ${e.message}');
@@ -94,9 +76,6 @@ class AuthService {
     }
   }
 
-  // ============================================================
-  // 👤 GET CURRENT USER
-  // ============================================================
   static User? getCurrentUser() => _auth.currentUser;
 
   static bool isEmailVerified() {
@@ -104,9 +83,6 @@ class AuthService {
     return user?.emailVerified ?? false;
   }
 
-  // ============================================================
-  // 🔍 CHECK ADMIN VERIFICATION
-  // ============================================================
   static Future<bool> isUserVerifiedByAdmin(String uid) async {
     try {
       final doc = await _firestore.collection('users').doc(uid).get();
@@ -117,12 +93,9 @@ class AuthService {
     }
   }
 
-  // ============================================================
-  // 🔑 RESET PASSWORD - SEND 4 DIGIT CODE
-  // ============================================================
   static Future<bool> sendResetCode(String email) async {
     try {
-      final code = (Random().nextInt(9000) + 1000).toString(); // kode 4 digit
+      final code = (Random().nextInt(9000) + 1000).toString();
       final expiresAt = DateTime.now().add(const Duration(minutes: 10));
 
       await _firestore.collection('reset_codes').doc(email).set({
@@ -131,11 +104,7 @@ class AuthService {
         'expiresAt': expiresAt,
       });
 
-      // Untuk dev: tampilkan di console
       print('✅ Kode verifikasi untuk $email adalah: $code');
-
-      // Kirim email melalui Firebase Functions atau backend kamu di sini
-
       return true;
     } catch (e) {
       print('[AuthService] Gagal mengirim kode verifikasi: $e');
@@ -143,9 +112,6 @@ class AuthService {
     }
   }
 
-  // ============================================================
-  // 🔍 VERIFY 4 DIGIT RESET CODE
-  // ============================================================
   static Future<bool> verifyResetCode(String email, String inputCode) async {
     try {
       final doc = await _firestore.collection('reset_codes').doc(email).get();
@@ -155,10 +121,7 @@ class AuthService {
       final savedCode = data['code'];
       final expiresAt = (data['expiresAt'] as Timestamp).toDate();
 
-      if (DateTime.now().isAfter(expiresAt)) {
-        print('[AuthService] Kode sudah kedaluwarsa.');
-        return false;
-      }
+      if (DateTime.now().isAfter(expiresAt)) return false;
 
       return savedCode == inputCode;
     } catch (e) {
@@ -167,22 +130,13 @@ class AuthService {
     }
   }
 
-  // ============================================================
-  // 🔁 RESET PASSWORD SETELAH KODE TERVERIFIKASI
-  // ============================================================
   static Future<bool> resetPassword(String email, String newPassword) async {
     try {
       final methods = await _auth.fetchSignInMethodsForEmail(email);
-      if (!methods.contains('password')) {
-        print('[AuthService] Email tidak ditemukan atau tidak valid.');
-        return false;
-      }
+      if (!methods.contains('password')) return false;
 
-      // Firebase tidak izinkan langsung reset password user lain
-      // Solusi workaround: Kirim link reset ke email user
       await _auth.sendPasswordResetEmail(email: email);
       print('[AuthService] Link reset password dikirim ke $email.');
-
       return true;
     } catch (e) {
       print('[AuthService] Gagal reset password: $e');
