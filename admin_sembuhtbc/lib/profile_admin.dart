@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-//import 'package:firebase_auth/firebase_auth.dart';
 import 'auth_service.dart';
 import 'dart:io';
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:typed_data'; // Pastikan ini ada
 
 class ProfileAdminPage extends StatefulWidget {
   const ProfileAdminPage({super.key});
@@ -313,14 +312,40 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pushReplacementNamed(context, '/home'),
+        // Bagian leading yang diubah
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: TextButton(
+                style: TextButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(color: Colors.grey[300]!, width: 1),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pushReplacementNamed(context, '/home');
+                },
+                child: const Icon(
+                  Icons.arrow_back,
+                  size: 24,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ),
         ),
         title: const Text(
           'Profil Admin',
           style: TextStyle(
-            fontFamily: 'Montserrat',
+            fontFamily:
+                'Montserrat', // Pastikan font ini tersedia di project Anda
             fontSize: 24,
             color: Color(0xFF0072CE),
             fontWeight: FontWeight.bold,
@@ -681,7 +706,7 @@ class _ProfileAdminPageState extends State<ProfileAdminPage> {
               ),
             ),
             child: const Text(
-              "Logout",
+              "Logout", // Teks tombol tetap "Logout"
               style: TextStyle(
                 fontFamily: 'Montserrat',
                 color: Colors.white,
