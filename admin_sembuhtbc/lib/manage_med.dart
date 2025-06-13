@@ -608,7 +608,7 @@ class _ManageMedPageState extends State<ManageMedPage> {
               Row(
                 children: [
                   Expanded(
-                    flex: 2,
+                    flex: 1,
                     child: TextFormField(
                       controller: _timesPerDayController,
                       keyboardType: TextInputType.number,

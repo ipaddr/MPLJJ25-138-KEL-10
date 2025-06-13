@@ -212,7 +212,11 @@ class _VerifikasiPasienScreenState extends State<VerifikasiPasienScreen> {
             return Center(
               child: Text(
                 "Tidak ada permintaan verifikasi.",
-                style: TextStyle(fontFamily: 'Roboto', color: Colors.grey[600]),
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 18,
+                  color: Colors.grey[600],
+                ),
               ),
             );
           }
