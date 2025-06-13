@@ -30,22 +30,28 @@ class _RewardPageState extends State<RewardPage> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}"));
+            // Tangani error dengan lebih baik, misal jika field 'rewards' tidak ada atau formatnya salah
+            // print("Error fetching user rewards: ${snapshot.error}"); // Debugging
+            return Center(
+              child: Text("Error memuat hadiah: ${snapshot.error}"),
+            );
           }
 
-          final Map<String, dynamic> userRewards = snapshot.data ?? {};
+          // PERBAIKAN UTAMA: Konversi data secara aman
+          final Map<String, dynamic> userRewards = Map<String, dynamic>.from(
+            snapshot.data ?? {},
+          );
+
           final bool reward1Claimed =
               userRewards['minumObat2Hari2KaliClaimed'] ?? false;
           final bool reward2Claimed =
               userRewards['minumObatSemingguPenuhClaimed'] ?? false;
-          // Tambahkan deklarasi untuk reward lain jika ada di Firestore
           final bool rewardTanpaPutusClaimed =
               userRewards['minumObatTanpaPutusClaimed'] ?? false;
           final bool rewardSampaiHabisClaimed =
               userRewards['minumObatSampaiHabisClaimed'] ?? false;
 
           return FutureBuilder<Map<String, int>>(
-            // Memeriksa progress untuk reward "2x dalam 2 hari"
             future: AuthService.getDosesTakenStats(
               userId: _currentUser!.uid,
               daysAgo: 2,
@@ -55,11 +61,9 @@ class _RewardPageState extends State<RewardPage> {
               if (dosesStatsSnapshot.connectionState == ConnectionState.done &&
                   dosesStatsSnapshot.hasData) {
                 final stats = dosesStatsSnapshot.data!;
-                // Kriteria: min 2 dosis diminum dalam 2 hari terakhir.
                 reward1Completed = stats['taken']! >= 2;
               }
 
-              // Menghitung status reward "Minum obat seminggu penuh"
               return FutureBuilder<int>(
                 future: AuthService.getConsecutiveDaysCompleted(
                   _currentUser!.uid,
@@ -69,57 +73,76 @@ class _RewardPageState extends State<RewardPage> {
                   if (consecutiveDaysSnapshot.connectionState ==
                           ConnectionState.done &&
                       consecutiveDaysSnapshot.hasData) {
-                    reward2Completed =
-                        consecutiveDaysSnapshot.data! >=
-                        7; // Kriteria: 7 hari berturut-turut
+                    reward2Completed = consecutiveDaysSnapshot.data! >= 7;
                   }
 
-                  // TODO: Tambahkan FutureBuilder/logika untuk reward "tanpa putus" dan "sampai habis"
-                  bool reward3Completed = false; // Placeholder
-                  bool reward4Completed = false; // Placeholder
+                  // === Logika untuk reward "Minum obat tanpa putus" ===
+                  return FutureBuilder<bool>(
+                    future: AuthService.hasCompletedConsecutiveDays(
+                      _currentUser!.uid,
+                      30,
+                    ), // Kriteria 30 hari tanpa putus
+                    builder: (context, reward3CompletedSnapshot) {
+                      bool reward3Completed = false;
+                      if (reward3CompletedSnapshot.connectionState ==
+                              ConnectionState.done &&
+                          reward3CompletedSnapshot.hasData) {
+                        reward3Completed = reward3CompletedSnapshot.data!;
+                      }
 
-                  return Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        const Text(
-                          "Kupon apresiasi setara dengan nilai uang dan dapat ditukarkan dengan uang",
-                          style: TextStyle(fontSize: 16),
-                          textAlign: TextAlign.center,
+                      // === Logika untuk reward "Minum obat sampai habis" ===
+                      return FutureBuilder<bool>(
+                        future: AuthService.hasCompletedAllMedication(
+                          _currentUser!.uid,
                         ),
-                        const SizedBox(height: 20),
-                        // Reward 1: Minum obat 2x dalam 2 hari
-                        _buildTask(
-                          "Minum obat 2x dalam 2 hari",
-                          reward1Completed,
-                          isClaimed: reward1Claimed, // Teruskan status klaim
-                          rewardKey:
-                              'minumObat2Hari2KaliClaimed', // Kunci untuk reward ini
-                        ),
-                        // Reward 2: Minum obat seminggu penuh
-                        _buildTask(
-                          "Minum obat seminggu penuh",
-                          reward2Completed,
-                          isClaimed:
-                              reward2Claimed, // Status klaim untuk reward ini
-                          rewardKey: 'minumObatSemingguPenuhClaimed',
-                        ),
-                        // Reward 3: Minum obat tanpa putus (ganti false dengan logika sebenarnya)
-                        _buildTask(
-                          "Minum obat tanpa putus (30 hari)", // Contoh kriteria
-                          reward3Completed, // Ganti dengan logika deteksi completed
-                          isClaimed: rewardTanpaPutusClaimed,
-                          rewardKey: 'minumObatTanpaPutusClaimed',
-                        ),
-                        // Reward 4: Minum obat sampai habis (ganti false dengan logika sebenarnya)
-                        _buildTask(
-                          "Minum obat sampai habis",
-                          reward4Completed, // Ganti dengan logika deteksi completed
-                          isClaimed: rewardSampaiHabisClaimed,
-                          rewardKey: 'minumObatSampaiHabisClaimed',
-                        ),
-                      ],
-                    ),
+                        builder: (context, reward4CompletedSnapshot) {
+                          bool reward4Completed = false;
+                          if (reward4CompletedSnapshot.connectionState ==
+                                  ConnectionState.done &&
+                              reward4CompletedSnapshot.hasData) {
+                            reward4Completed = reward4CompletedSnapshot.data!;
+                          }
+
+                          return Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              children: [
+                                const Text(
+                                  "Kupon apresiasi setara dengan nilai uang dan dapat ditukarkan dengan uang",
+                                  style: TextStyle(fontSize: 16),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 20),
+                                _buildTask(
+                                  "Minum obat 2x dalam 2 hari",
+                                  reward1Completed,
+                                  isClaimed: reward1Claimed,
+                                  rewardKey: 'minumObat2Hari2KaliClaimed',
+                                ),
+                                _buildTask(
+                                  "Minum obat seminggu penuh",
+                                  reward2Completed,
+                                  isClaimed: reward2Claimed,
+                                  rewardKey: 'minumObatSemingguPenuhClaimed',
+                                ),
+                                _buildTask(
+                                  "Minum obat tanpa putus (30 hari)",
+                                  reward3Completed,
+                                  isClaimed: rewardTanpaPutusClaimed,
+                                  rewardKey: 'minumObatTanpaPutusClaimed',
+                                ),
+                                _buildTask(
+                                  "Minum obat sampai habis",
+                                  reward4Completed,
+                                  isClaimed: rewardSampaiHabisClaimed,
+                                  rewardKey: 'minumObatSampaiHabisClaimed',
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
                   );
                 },
               );
@@ -133,12 +156,10 @@ class _RewardPageState extends State<RewardPage> {
   Widget _buildTask(
     String title,
     bool completed, {
-    // isFirst tidak lagi diperlukan untuk logika onTap
-    required bool isClaimed, // Menerima status klaim
-    String? rewardKey, // Kunci reward untuk update Firestore
+    required bool isClaimed,
+    String? rewardKey,
   }) {
     return GestureDetector(
-      // Hanya bisa ditekan jika completed, belum diklaim, dan rewardKey tidak null
       onTap:
           completed && !isClaimed && rewardKey != null
               ? () => _goToRewardCodePage(rewardKey!)
@@ -149,7 +170,7 @@ class _RewardPageState extends State<RewardPage> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6)],
+          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -157,9 +178,9 @@ class _RewardPageState extends State<RewardPage> {
             Flexible(child: Text(title)),
             Row(
               children: [
-                if (isClaimed) // Jika sudah diklaim, tampilkan centang hijau
+                if (isClaimed)
                   const Icon(Icons.check_circle, color: Colors.green)
-                else // Jika belum diklaim
+                else
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -185,20 +206,16 @@ class _RewardPageState extends State<RewardPage> {
   Future<void> _goToRewardCodePage(String rewardKey) async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => RewardCodePage(rewardKey: rewardKey),
-      ), // Teruskan rewardKey
+      MaterialPageRoute(builder: (_) => RewardCodePage(rewardKey: rewardKey)),
     );
 
     if (result == true) {
-      // Reward telah diklaim dari RewardCodePage, update di Firestore
       await AuthService.updateRewardClaimStatus(
         _currentUser!.uid,
         rewardKey,
         true,
       );
       if (mounted) {
-        // Pastikan widget masih mounted sebelum menampilkan SnackBar
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(

@@ -60,10 +60,10 @@ class AuthService {
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
         'rewards': {
-          // Inisialisasi field rewards
           'minumObat2Hari2KaliClaimed': false,
           'minumObatSemingguPenuhClaimed': false,
-          // Tambahkan reward lainnya di sini
+          'minumObatTanpaPutusClaimed': false,
+          'minumObatSampaiHabisClaimed': false,
         },
       });
 
@@ -169,7 +169,13 @@ class AuthService {
         .map(
           (snapshot) =>
               snapshot.docs
-                  .map((doc) => {...doc.data(), 'id': doc.id})
+                  .map(
+                    (doc) => {
+                      // Pastikan data dikonversi ke Map<String, dynamic> dengan aman
+                      ...doc.data() as Map<String, dynamic>,
+                      'id': doc.id,
+                    },
+                  )
                   .toList(),
         );
   }
@@ -219,8 +225,12 @@ class AuthService {
               .doc(dateKey)
               .get();
 
-      if (doc.exists && doc.data() != null && doc.data()!['doses'] is Map) {
-        return Map<String, bool>.from(doc.data()!['doses']);
+      if (doc.exists && doc.data() != null) {
+        // Pastikan docData adalah Map<String, dynamic>
+        final Map<String, dynamic> docData = doc.data() as Map<String, dynamic>;
+        if (docData['doses'] is Map) {
+          return Map<String, bool>.from(docData['doses']!);
+        }
       }
       return {};
     } catch (e) {
@@ -333,19 +343,18 @@ class AuthService {
 
   // ============== FUNGSI BARU UNTUK REWARD ==============
 
-  // Mendapatkan status reward user
   static Stream<Map<String, dynamic>> getUserRewards(String userId) {
     return _firestore.collection('users').doc(userId).snapshots().map((
       snapshot,
     ) {
       if (snapshot.exists && snapshot.data() != null) {
-        return (snapshot.data()!['rewards'] ?? {}) as Map<String, dynamic>;
+        final data = snapshot.data();
+        return Map<String, dynamic>.from(data?['rewards'] ?? {});
       }
       return {};
     });
   }
 
-  // Mengupdate status klaim reward
   static Future<void> updateRewardClaimStatus(
     String userId,
     String rewardKey,
@@ -361,17 +370,15 @@ class AuthService {
     }
   }
 
-  // Mendapatkan jumlah dosis diminum dalam X hari terakhir
   static Future<Map<String, int>> getDosesTakenStats({
     required String userId,
-    required int daysAgo, // Misal 2 untuk "2 hari terakhir"
+    required int daysAgo,
   }) async {
     final DateTime now = DateTime.now();
-    final DateTime startDate = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).subtract(Duration(days: daysAgo - 1)); // Hitung dari X hari yang lalu
+    final DateTime startOfDay = DateTime(now.year, now.month, now.day);
+    final DateTime checkStartDate = startOfDay.subtract(
+      Duration(days: daysAgo - 1),
+    );
 
     int totalDosesInPeriod = 0;
     int takenDosesInPeriod = 0;
@@ -386,15 +393,32 @@ class AuthService {
 
     for (var scheduleDoc in schedulesSnapshot.docs) {
       final scheduleId = scheduleDoc.id;
-      final scheduleData = scheduleDoc.data();
+      // PERBAIKAN: Cast scheduleData ke Map<String, dynamic>
+      final Map<String, dynamic> scheduleData =
+          scheduleDoc.data() as Map<String, dynamic>;
       final List<String> scheduledTimes = List<String>.from(
         scheduleData['scheduledTimes'] ?? [],
       );
 
+      final String scheduleStartDateStr =
+          scheduleData['startDate'] as String? ?? '1970-01-01';
+      final String scheduleEndDateStr =
+          scheduleData['endDate'] as String? ?? '2999-12-31';
+
+      final DateTime scheduleStartDate = DateTime.parse(scheduleStartDateStr);
+      final DateTime scheduleEndDate = DateTime.parse(scheduleEndDateStr);
+
       for (int i = 0; i < daysAgo; i++) {
-        // Iterasi untuk setiap hari dalam periode
-        final currentCheckDate = startDate.add(Duration(days: i));
-        final dateKey = DateFormat('yyyy-MM-dd').format(currentCheckDate);
+        final currentCheckDate = checkStartDate.add(Duration(days: i));
+        final String dateKey = DateFormat(
+          'yyyy-MM-dd',
+        ).format(currentCheckDate);
+
+        // Only consider this schedule if it was active on currentCheckDate
+        if (currentCheckDate.isAfter(scheduleEndDate) ||
+            currentCheckDate.isBefore(scheduleStartDate)) {
+          continue; // Schedule not active on this day
+        }
 
         final takenDosesDoc =
             await _firestore
@@ -406,29 +430,22 @@ class AuthService {
                 .doc(dateKey)
                 .get();
 
-        if (takenDosesDoc.exists && takenDosesDoc.data() != null) {
-          final Map<String, bool> dosesStatus = Map<String, bool>.from(
-            takenDosesDoc.data()!['doses'] ?? {},
-          );
+        final Map<String, bool> dosesStatus =
+            (takenDosesDoc.exists && takenDosesDoc.data() != null)
+                ? Map<String, bool>.from(takenDosesDoc.data()!['doses'] ?? {})
+                : {};
 
-          totalDosesInPeriod +=
-              scheduledTimes
-                  .length; // Setiap jadwal memiliki sejumlah dosis per hari
-          dosesStatus.forEach((time, isTaken) {
-            if (isTaken) {
-              takenDosesInPeriod++;
-            }
-          });
-        } else {
-          // Jika dokumen taken_doses tidak ada, berarti tidak ada obat yang diminum untuk jadwal ini di tanggal tersebut.
-          totalDosesInPeriod += scheduledTimes.length;
-        }
+        totalDosesInPeriod += scheduledTimes.length;
+        dosesStatus.forEach((time, isTaken) {
+          if (isTaken) {
+            takenDosesInPeriod++;
+          }
+        });
       }
     }
     return {'taken': takenDosesInPeriod, 'total': totalDosesInPeriod};
   }
 
-  // Metode untuk memeriksa apakah semua dosis pada hari tertentu telah diminum
   static Future<bool> areAllDosesTakenForDay(
     String userId,
     DateTime date,
@@ -443,29 +460,50 @@ class AuthService {
             .where('isActive', isEqualTo: true)
             .get();
 
-    if (schedulesSnapshot.docs.isEmpty) {
-      return false; // Tidak ada jadwal obat, jadi tidak ada yang bisa diselesaikan
-    }
+    // Track if there's any active schedule for the given date that *requires* doses
+    bool hasAnyDosesScheduledForDate = false;
 
     for (var scheduleDoc in schedulesSnapshot.docs) {
-      final scheduleId = scheduleDoc.id;
+      // PERBAIKAN: Cast scheduleData ke Map<String, dynamic>
+      final Map<String, dynamic> scheduleData =
+          scheduleDoc.data() as Map<String, dynamic>;
+      final String scheduleStartDateStr =
+          scheduleData['startDate'] as String? ?? '1970-01-01';
+      final String scheduleEndDateStr =
+          scheduleData['endDate'] as String? ?? '2999-12-31';
+
+      final DateTime scheduleStartDate = DateTime.parse(scheduleStartDateStr);
+      final DateTime scheduleEndDate = DateTime.parse(scheduleEndDateStr);
+
+      // Check if this schedule is active on the given date
+      final DateTime dateAtMidnight = DateTime(date.year, date.month, date.day);
+      if (dateAtMidnight.isBefore(scheduleStartDate) ||
+          dateAtMidnight.isAfter(scheduleEndDate)) {
+        continue; // Schedule not active on this specific date
+      }
+
       final List<String> scheduledTimes = List<String>.from(
-        scheduleDoc.data()['scheduledTimes'] ?? [],
+        scheduleData['scheduledTimes'] ?? [],
       );
 
-      if (scheduledTimes.isEmpty)
-        continue; // Lewati jika tidak ada waktu terjadwal
+      if (scheduledTimes.isEmpty) {
+        continue; // No doses scheduled for this specific schedule, so it doesn't prevent completion
+      }
+
+      hasAnyDosesScheduledForDate =
+          true; // Yes, there are doses scheduled for today
 
       final takenDosesDoc =
           await _firestore
               .collection('users')
               .doc(userId)
               .collection('medication_schedules')
-              .doc(scheduleId)
+              .doc(scheduleDoc.id)
               .collection('taken_doses')
               .doc(dateKey)
               .get();
 
+      // PERBAIKAN: Cast dosesStatus ke Map<String, bool>
       final Map<String, bool> dosesStatus =
           (takenDosesDoc.exists && takenDosesDoc.data() != null)
               ? Map<String, bool>.from(takenDosesDoc.data()!['doses'] ?? {})
@@ -473,23 +511,20 @@ class AuthService {
 
       for (String time in scheduledTimes) {
         if (dosesStatus[time] != true) {
-          return false; // Ada dosis yang belum diminum
+          return false; // Found an untaken dose for an active schedule on this date
         }
       }
     }
-    return true; // Semua dosis telah diminum untuk hari itu
+    // If we reached here:
+    // 1. Either there were NO active schedules for the `date` (hasAnyDosesScheduledForDate is false) -> return true (day is "completed" because no doses were required)
+    // 2. Or there were active schedules for the `date` AND all of them were taken -> return true.
+    return true; // If no un-taken doses found, return true.
   }
 
-  // Mendapatkan jumlah hari berturut-turut di mana semua dosis diminum
   static Future<int> getConsecutiveDaysCompleted(String userId) async {
     int consecutiveDays = 0;
     DateTime currentDate = DateTime.now();
-    // Start from yesterday to check if 'today' is complete.
-    // If 'today' needs to be complete, then loop from current date backward.
-    // For "minum obat seminggu penuh", it needs to check last 7 days.
-    // Let's assume "consecutive" means starting from the most recent full day.
 
-    // Adjust current date to midnight for consistent comparison
     currentDate = DateTime(
       currentDate.year,
       currentDate.month,
@@ -497,26 +532,120 @@ class AuthService {
     );
 
     // Check from today backwards
-    for (int i = 0; i < 365; i++) {
-      // Check up to a year back, adjust as needed
-      final dateToCheck = currentDate.subtract(Duration(days: i));
-      final bool allTaken = await areAllDosesTakenForDay(userId, dateToCheck);
+    // For "consecutive days completed", typically we check for *fully completed days*.
+    // If today is not fully completed yet, it breaks the streak starting from today.
+    // If the streak is calculated for the most recent completed period,
+    // we should iterate backward.
 
-      if (allTaken) {
+    // Iterasi mundur dari HARI INI
+    for (int i = 0; i < 365; i++) {
+      // Max 365 days streak check
+      final dateToCheck = currentDate.subtract(Duration(days: i));
+      final bool allTakenOnThisDay = await areAllDosesTakenForDay(
+        userId,
+        dateToCheck,
+      );
+
+      if (allTakenOnThisDay) {
         consecutiveDays++;
       } else {
-        // If current day is not complete AND it's not the very first day being checked,
-        // it means the streak is broken.
-        if (i > 0) {
-          // Only break if it's not today and today isn't finished
-          break;
-        } else {
-          // If today is not complete, the streak is 0 if no prior days completed
-          if (!allTaken && consecutiveDays == 0)
-            return 0; // If today is not complete, streak starts from 0 for today.
-        }
+        // If today is NOT fully completed, the streak from today breaks.
+        // If it's a previous day that is NOT fully completed, the streak also breaks.
+        return consecutiveDays; // Return the streak found so far.
       }
     }
-    return consecutiveDays;
+    return consecutiveDays; // Return streak if it goes back 365 days
+  }
+
+  static Future<bool> hasCompletedConsecutiveDays(
+    String userId,
+    int requiredDays,
+  ) async {
+    final int consecutive = await getConsecutiveDaysCompleted(userId);
+    return consecutive >= requiredDays;
+  }
+
+  static Future<bool> hasCompletedAllMedication(String userId) async {
+    final schedulesSnapshot =
+        await _firestore
+            .collection('users')
+            .doc(userId)
+            .collection('medication_schedules')
+            .where('isActive', isEqualTo: true)
+            .get();
+
+    if (schedulesSnapshot.docs.isEmpty) {
+      return false; // No schedules, so cannot be completed
+    }
+
+    final DateTime now = DateTime.now();
+    final DateTime todayAtMidnight = DateTime(now.year, now.month, now.day);
+
+    for (var scheduleDoc in schedulesSnapshot.docs) {
+      // PERBAIKAN: Cast scheduleData ke Map<String, dynamic>
+      final Map<String, dynamic> scheduleData =
+          scheduleDoc.data() as Map<String, dynamic>;
+      final String startDateStr =
+          scheduleData['startDate'] as String? ?? '1970-01-01';
+      final String endDateStr =
+          scheduleData['endDate'] as String? ?? '2999-12-31';
+      final int timesPerDay = scheduleData['timesPerDay'] as int? ?? 1;
+
+      final DateTime scheduleStartDate = DateTime.parse(startDateStr);
+      final DateTime scheduleEndDate = DateTime.parse(endDateStr);
+
+      // Condition for "all medication" - the schedule must have already ended.
+      if (scheduleEndDate.isAfter(todayAtMidnight)) {
+        // Use todayAtMidnight for comparison
+        // If the schedule is still ongoing or ends today, it's not "completed all medication" yet.
+        return false;
+      }
+
+      int actualTakenDosesForThisSchedule = 0;
+      int totalExpectedDosesForThisSchedule = 0;
+
+      // Iterate from schedule start date to schedule end date to count expected and taken doses
+      for (
+        DateTime d = scheduleStartDate;
+        d.isBefore(scheduleEndDate.add(const Duration(days: 1)));
+        d = d.add(const Duration(days: 1))
+      ) {
+        final String dateKey = DateFormat('yyyy-MM-dd').format(d);
+        final List<String> scheduledTimes = List<String>.from(
+          scheduleData['scheduledTimes'] ?? [],
+        );
+        totalExpectedDosesForThisSchedule += scheduledTimes.length;
+
+        final takenDosesDoc =
+            await _firestore
+                .collection('users')
+                .doc(userId)
+                .collection('medication_schedules')
+                .doc(scheduleDoc.id)
+                .collection('taken_doses')
+                .doc(dateKey)
+                .get();
+
+        if (takenDosesDoc.exists && takenDosesDoc.data() != null) {
+          // PERBAIKAN: Cast dosesStatus ke Map<String, bool>
+          final Map<String, bool> dosesStatus = Map<String, bool>.from(
+            takenDosesDoc.data()!['doses'] ?? {},
+          );
+          dosesStatus.forEach((time, isTaken) {
+            if (isTaken) {
+              actualTakenDosesForThisSchedule++;
+            }
+          });
+        }
+      }
+
+      // If for this specific *ended* schedule, taken doses don't match expected total, return false.
+      if (actualTakenDosesForThisSchedule < totalExpectedDosesForThisSchedule) {
+        return false;
+      }
+    }
+    // If all schedules have either not yet started or have ended AND all doses were taken, then true.
+    // Also, if there are no schedules, it should return false based on initial check.
+    return true;
   }
 }
