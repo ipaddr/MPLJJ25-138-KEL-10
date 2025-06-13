@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:user/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -28,25 +29,43 @@ class _LoginPageState extends State<LoginPage> {
 
     setState(() => _isLoading = true);
 
-    final userCredential = await AuthService.signInWithEmail(email, password);
+    try {
+      final credential = await AuthService.signInWithEmail(email, password);
+      final user = credential?.user;
 
-    setState(() => _isLoading = false);
+      if (user == null) {
+        throw Exception('Gagal mendapatkan user.');
+      }
 
-    if (userCredential != null) {
-      final user = userCredential.user;
-      if (user != null && user.emailVerified) {
+      final uid = user.uid;
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+      if (!userDoc.exists) {
+        throw Exception('User tidak ditemukan di Firestore.');
+      }
+
+      final isVerified = userDoc.data()?['isVerified'] == true;
+
+      if (!isVerified) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Akun Anda belum diverifikasi oleh admin')),
+        );
+      } else {
+        // SUKSES LOGIN
         if (context.mounted) {
           Navigator.pushReplacementNamed(context, '/home');
         }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Silakan verifikasi email Anda terlebih dahulu')),
-        );
       }
-    } else {
+    } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login gagal. Cek email dan sandi Anda')),
+        SnackBar(content: Text('Login gagal: ${e.message}')),
       );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login error: $e')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
