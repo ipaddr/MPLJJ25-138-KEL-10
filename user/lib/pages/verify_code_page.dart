@@ -8,7 +8,8 @@ class VerifyCodePage extends StatefulWidget {
 }
 
 class _VerifyCodePageState extends State<VerifyCodePage> {
-  final List<TextEditingController> _controllers = List.generate(4, (_) => TextEditingController());
+  final List<TextEditingController> _controllers =
+      List.generate(4, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(4, (_) => FocusNode());
 
   late String email;
@@ -17,9 +18,18 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final args = ModalRoute.of(context)!.settings.arguments as Map;
-    email = args['email'];
-    sentCode = args['code'];
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map<String, dynamic>) {
+      email = args['email'] ?? '';
+      sentCode = args['code'] ?? '';
+    } else {
+      email = '';
+      sentCode = '';
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Terjadi kesalahan: data tidak valid.')),
+      );
+      Navigator.pop(context); // kembali jika tidak ada data
+    }
   }
 
   @override
@@ -134,7 +144,9 @@ class _VerifyCodePageState extends State<VerifyCodePage> {
             Center(
               child: GestureDetector(
                 onTap: () {
-                  // TODO: Implementasi kirim ulang kode (jika perlu)
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Fitur kirim ulang belum tersedia.')),
+                  );
                 },
                 child: const Text(
                   'Belum menerima kode? Kirim ulang',

@@ -33,8 +33,15 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = false);
 
     if (userCredential != null) {
-      if (context.mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
+      final user = userCredential.user;
+      if (user != null && user.emailVerified) {
+        if (context.mounted) {
+          Navigator.pushReplacementNamed(context, '/home');
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Silakan verifikasi email Anda terlebih dahulu')),
+        );
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -74,14 +81,10 @@ class _LoginPageState extends State<LoginPage> {
               TextField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
-                decoration: _buildInputDecoration(
-                  "Masukkan sandi Anda",
-                ).copyWith(
+                decoration: _buildInputDecoration("Masukkan sandi Anda").copyWith(
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
                     ),
                     onPressed: () {
                       setState(() => _obscurePassword = !_obscurePassword);
@@ -106,13 +109,8 @@ class _LoginPageState extends State<LoginPage> {
                 onPressed: _isLoading ? null : _handleLogin,
                 style: _buttonStyle(),
                 child: _isLoading
-                    ? const CircularProgressIndicator(
-                        color: Colors.white,
-                      )
-                    : const Text(
-                        'Login',
-                        style: TextStyle(color: Colors.white),
-                      ),
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('Login', style: TextStyle(color: Colors.white)),
               ),
               const Spacer(),
               Row(
