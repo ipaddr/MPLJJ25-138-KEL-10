@@ -30,6 +30,7 @@ import 'pages/verification_success_page.dart';
 import 'pages/verification_done_page.dart';
 import 'pages/take_photo_page.dart';
 import 'pages/waiting_photo_page.dart';
+import 'pages/waiting_result_page.dart';
 import 'pages/result_photo_page.dart';
 
 // Reward
@@ -62,7 +63,8 @@ void main() async {
   tz.setLocalLocation(tz.getLocation('Asia/Jakarta'));
 
   const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('app_icon');
+    AndroidInitializationSettings('@mipmap/ic_launcher');
+
   const DarwinInitializationSettings initializationSettingsIOS =
       DarwinInitializationSettings(
         requestAlertPermission: true,
@@ -87,6 +89,8 @@ void main() async {
 
   runApp(const MyApp());
 }
+
+// ... (bagian atas kode main.dart tetap sama)
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -114,8 +118,7 @@ class MyApp extends StatelessWidget {
 
         '/med-info': (context) {
           final args =
-              ModalRoute.of(context)!.settings.arguments
-                  as Map<String, dynamic>;
+              ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
           return MedInfoPage(
             scheduleId: args['scheduleId'] as String,
             name: args['name'] as String,
@@ -126,8 +129,7 @@ class MyApp extends StatelessWidget {
         },
         '/verification-warning': (context) {
           final args =
-              ModalRoute.of(context)!.settings.arguments
-                  as Map<String, dynamic>;
+              ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
           return VerificationWarningPage(
             scheduleId: args['scheduleId'] as String,
             doseTime: args['doseTime'] as String,
@@ -136,8 +138,7 @@ class MyApp extends StatelessWidget {
         '/waiting-verification': (context) => const WaitingVerificationPage(),
         '/verification-success': (context) {
           final args =
-              ModalRoute.of(context)!.settings.arguments
-                  as Map<String, dynamic>?;
+              ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
           return VerificationSuccessPage(
             isSuccess: args?['isSuccess'] as bool? ?? true,
             message:
@@ -145,42 +146,48 @@ class MyApp extends StatelessWidget {
                 "Akun Anda telah berhasil diverifikasi oleh admin.",
           );
         },
-        '/verif-done': (context) => const VerificationDonePage(),
+        // PERHATIKAN PERUBAHAN DI BAWAH INI
+        '/verif-done': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
+          return VerificationDonePage(
+            scheduleId: args?['scheduleId'] as String? ?? '', // Default value jika null
+            doseTime: args?['doseTime'] as String? ?? '',     // Default value jika null
+          );
+        },
         '/take-photo': (context) {
           final args =
-              ModalRoute.of(context)!.settings.arguments
-                  as Map<String, dynamic>;
+              ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
           return TakePhotoPage(
             scheduleId: args['scheduleId'] as String,
             doseTime: args['doseTime'] as String,
           );
         },
+        // --- START ROUTE UPDATE ---
+        // Memastikan '/waiting-photo' mengarah ke WaitingResultPage
         '/waiting-photo': (context) {
-  final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-  return WaitingPhotoPage(
-    scheduleId: args['scheduleId'] as String,
-    doseTime: args['doseTime'] as String,
-    imagePath: args['imagePath'] as String, // ← TAMBAHKAN INI
-  );
-},
-
-        '/result-photo': (context) {
-          final args =
-              ModalRoute.of(context)!.settings.arguments
-                  as Map<String, dynamic>;
-          return ResultPhotoPage(
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          return WaitingResultPage( // Menggunakan WaitingResultPage
             scheduleId: args['scheduleId'] as String,
             doseTime: args['doseTime'] as String,
-            isPhotoVerified: args['isPhotoVerified'] as bool,
+            imagePath: args['imagePath'] as String,
+          );
+        },
+        // --- END ROUTE UPDATE ---
+
+        '/result-photo': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          return ResultPhotoPage(
+              scheduleId: args['scheduleId'],
+              doseTime: args['doseTime'],
+              isPhotoVerified: args['isPhotoVerified'],
+              imagePath: args['imagePath'],
           );
         },
 
         '/reward': (context) => const RewardPage(),
-        // RewardCodePage
         '/reward-code': (context) {
           final args =
-              ModalRoute.of(context)!.settings.arguments
-                  as Map<String, dynamic>;
+              ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
           return RewardCodePage(rewardKey: args['rewardKey'] as String);
         },
       },

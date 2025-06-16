@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:user/services/auth_service.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:user/services/gemini_service.dart'; // Import GeminiService
+import '../../main.dart'; // Supaya bisa akses flutterLocalNotificationsPlugin
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -27,16 +31,40 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _checkCurrentUserAndLoadData();
+    // Mengatur locale default untuk format tanggal dan waktu menjadi Bahasa Indonesia
     Intl.defaultLocale = 'id_ID';
+    // Meminta izin notifikasi saat aplikasi dimulai (opsional, bisa juga di layar onboarding)
+    _requestNotificationPermissions();
+  }
+
+  // Meminta izin notifikasi untuk Android 13+
+  void _requestNotificationPermissions() async {
+    // Hanya perlu untuk Android 13 (API 33) ke atas
+    if (Theme.of(context).platform == TargetPlatform.android) {
+      final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+          flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+
+      if (androidImplementation != null) {
+        final bool? granted = await androidImplementation.requestNotificationsPermission();
+        if (granted != null && granted) {
+          print("Izin notifikasi Android diberikan.");
+        } else {
+          print("Izin notifikasi Android ditolak.");
+        }
+      }
+    }
+    // Untuk iOS, izin diminta pada InitializationSettings di main.dart
   }
 
   void _checkCurrentUserAndLoadData() {
     if (_currentUser == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Navigasi ke halaman login jika pengguna belum masuk
         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
       });
     } else {
-      _loadUserProfile();
+      _loadUserProfile(); // Muat profil pengguna jika sudah masuk
     }
   }
 
@@ -44,9 +72,58 @@ class _HomePageState extends State<HomePage> {
     final profile = await _authService.getUserProfile(_currentUser!.uid);
     if (mounted) {
       setState(() {
-        _userProfile = profile;
+        _userProfile = profile; // Perbarui state dengan data profil
       });
     }
+  }
+
+  /// Menjadwalkan notifikasi pengingat minum obat.
+  /// Notifikasi akan dijadwalkan 5 menit sebelum waktu dosis yang sebenarnya.
+  /// Notifikasi tidak akan dijadwalkan jika waktu pengingat sudah lewat.
+  Future<void> scheduleReminderNotification({
+    required String medicineName,
+    required String doseTime,
+    required DateTime scheduledDateTime,
+  }) async {
+    // Hitung waktu notifikasi = 5 menit sebelum waktu minum obat yang dijadwalkan
+    final reminderTime = scheduledDateTime.subtract(const Duration(minutes: 5));
+
+    // Jangan jadwalkan notifikasi jika waktu pengingat sudah lewat dari waktu sekarang
+    // Ini adalah filter utama untuk notifikasi yang sudah tidak relevan.
+    if (reminderTime.isBefore(tz.TZDateTime.now(tz.local))) {
+      print('Waktu pengingat untuk $medicineName pada $doseTime sudah lewat. Tidak dijadwalkan.');
+      return;
+    }
+
+    // Ambil pesan notifikasi dari GeminiService
+    final message = await GeminiService.getReminderMessage(medicineName, doseTime);
+
+    // Jadwalkan notifikasi lokal
+    await flutterLocalNotificationsPlugin.zonedSchedule(
+      reminderTime.hashCode, // ID unik untuk notifikasi ini (gunakan hashCode untuk unik)
+      'Pengingat Minum Obat', // Judul notifikasi
+      message, // Pesan notifikasi dari Gemini
+      tz.TZDateTime.from(reminderTime, tz.local), // Waktu notifikasi dalam zona waktu lokal
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'reminder_channel', // ID Channel Android
+          'Pengingat Obat', // Nama Channel Android
+          channelDescription: 'Channel untuk notifikasi pengingat minum obat', // Deskripsi Channel
+          importance: Importance.max, // Pentingnya notifikasi (maksimal)
+          priority: Priority.high, // Prioritas notifikasi (tinggi)
+          playSound: true, // Putar suara saat notifikasi muncul
+          // Anda bisa menambahkan ikon kecil di sini jika diinginkan
+          // smallIcon: '@mipmap/ic_launcher',
+        ),
+      ),
+      androidAllowWhileIdle: true, // Izinkan notifikasi muncul bahkan saat perangkat dalam keadaan idle
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      // matchDateTimeComponents: DateTimeComponents.time, // Jika ingin notifikasi berulang harian
+      // Catatan: Jika ingin notifikasi berulang harian, Anda perlu strategi yang berbeda
+      // untuk ID notifikasi dan tidak membatalkan semua setiap kali build.
+    );
+    print('Notifikasi dijadwalkan untuk $medicineName pada ${DateFormat.Hm().format(reminderTime)}');
   }
 
   @override
@@ -73,7 +150,57 @@ class _HomePageState extends State<HomePage> {
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return _buildEmptyState();
           }
-          return _buildMainContent(snapshot.data!);
+
+          // Filter jadwal untuk hari yang dipilih
+          final allSchedules = snapshot.data!;
+          final activeSchedulesToday = allSchedules.where((schedule) {
+            final startDate = schedule['startDate'] as String?;
+            final endDate = schedule['endDate'] as String?;
+            if (startDate == null || endDate == null) return false;
+            final todayStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+            return todayStr.compareTo(startDate) >= 0 &&
+                todayStr.compareTo(endDate) <= 0;
+          }).toList();
+
+          // --- Penjadwalan Notifikasi ---
+          // Penting: Batalkan semua notifikasi yang telah dijadwalkan sebelumnya untuk menghindari duplikasi.
+          // Ini sangat krusial karena StreamBuilder bisa rebuild beberapa kali.
+          flutterLocalNotificationsPlugin.cancelAll(); 
+          
+          for (final schedule in activeSchedulesToday) {
+            final medicineName = schedule['medicineName'];
+            // Pastikan scheduledTimes adalah List<String>
+            final doseTimes = List<String>.from(schedule['scheduledTimes'] ?? []);
+
+            for (final doseTime in doseTimes) {
+              // Pisahkan string waktu (misal "08:30" menjadi "08" dan "30")
+              final parts = doseTime.split(':');
+              final int hour = int.parse(parts[0]);
+              final int minute = int.parse(parts[1]);
+              
+              // Buat objek TZDateTime lengkap untuk dosis berdasarkan tanggal yang dipilih dan waktu dosis
+              // Ini penting agar notifikasi dijadwalkan di zona waktu yang benar
+              final scheduledDateTime = tz.TZDateTime(
+                tz.local,
+                _selectedDate.year,
+                _selectedDate.month,
+                _selectedDate.day,
+                hour,
+                minute,
+              );
+
+              // Langsung panggil scheduleReminderNotification.
+              // Logika pengecekan apakah waktu sudah lewat ada di dalam fungsi tersebut.
+              scheduleReminderNotification(
+                medicineName: medicineName,
+                doseTime: doseTime,
+                scheduledDateTime: scheduledDateTime,
+              );
+            }
+          }
+          // --- Akhir Penjadwalan Notifikasi ---
+
+          return _buildMainContent(allSchedules);
         },
       ),
     );
@@ -142,17 +269,13 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // --- PERUBAHAN DI SINI ---
-  // Mengganti Container + IconButton menjadi TextButton yang distilasi.
   Widget _buildAppBarAction(
     IconData icon,
     Color color,
     VoidCallback onPressed,
   ) {
     return Padding(
-      // Padding ini menggantikan fungsi margin pada Container sebelumnya
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
-      // SizedBox untuk memastikan tombol memiliki ukuran yang pas
       child: SizedBox(
         width: 48,
         height: 48,
@@ -164,7 +287,6 @@ class _HomePageState extends State<HomePage> {
               borderRadius: BorderRadius.circular(12),
               side: BorderSide(color: Colors.grey.shade200),
             ),
-            // Padding internal tombol di-nol-kan agar ikon pas di tengah
             padding: EdgeInsets.zero,
           ),
           child: Icon(icon, color: color),
@@ -172,10 +294,9 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-  // --- AKHIR PERUBAHAN ---
 
   Widget _buildMainContent(List<Map<String, dynamic>> schedules) {
-    // ... (kode di sini tidak berubah)
+    // Filter jadwal yang aktif untuk tanggal yang dipilih
     final activeSchedulesToday =
         schedules.where((schedule) {
           final startDate = schedule['startDate'] as String?;
@@ -186,6 +307,7 @@ class _HomePageState extends State<HomePage> {
               todayStr.compareTo(endDate) <= 0;
         }).toList();
 
+    // Buat daftar dosis yang akan ditampilkan untuk hari ini
     List<Map<String, dynamic>> scheduledDosesToday = [];
     for (var schedule in activeSchedulesToday) {
       List<String> times = List<String>.from(schedule['scheduledTimes'] ?? []);
@@ -199,6 +321,7 @@ class _HomePageState extends State<HomePage> {
         });
       }
     }
+    // Urutkan dosis berdasarkan waktu agar tampilannya rapi
     scheduledDosesToday.sort(
       (a, b) => a['displayTime'].compareTo(b['displayTime']),
     );
@@ -217,12 +340,11 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildDateSelector() {
-    // ... (kode di sini tidak berubah)
     return SizedBox(
       height: 90,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: 7,
+        itemCount: 7, // Menampilkan 7 hari dari hari ini
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemBuilder: (context, index) {
           final date = DateTime.now().add(Duration(days: index));
@@ -243,7 +365,7 @@ class _HomePageState extends State<HomePage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    DateFormat('EEE').format(date),
+                    DateFormat('EEE').format(date), // Nama hari (misal: "Sen")
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -252,7 +374,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    date.day.toString(),
+                    date.day.toString(), // Tanggal (misal: "15")
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -271,7 +393,6 @@ class _HomePageState extends State<HomePage> {
   Widget _buildProgressAndScheduleList(
     List<Map<String, dynamic>> scheduledDosesToday,
   ) {
-    // ... (kode di sini tidak berubah)
     return FutureBuilder<Map<String, dynamic>>(
       future: _getMedicationProgress(scheduledDosesToday),
       builder: (context, progressSnapshot) {
@@ -322,7 +443,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildProgressCircle(int takenMedsCount, int totalMedsCount) {
-    // ... (kode di sini tidak berubah)
     final progressValue =
         totalMedsCount > 0 ? takenMedsCount / totalMedsCount : 0.0;
     return Center(
@@ -367,16 +487,16 @@ class _HomePageState extends State<HomePage> {
     List<Map<String, dynamic>> doses,
     Map<String, Map<String, bool>> allStatuses,
   ) {
-    // ... (kode di sini tidak berubah)
     return ListView.builder(
       itemCount: doses.length,
       shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
+      physics: const NeverScrollableScrollPhysics(), // Non-scrollable list
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemBuilder: (context, index) {
         final doseItem = doses[index];
         final scheduleId = doseItem['scheduleId'];
         final doseTime = doseItem['displayTime'];
+        // Cek apakah dosis sudah diminum berdasarkan status yang diambil dari Firebase
         final bool isTaken = allStatuses[scheduleId]?[doseTime] ?? false;
         return _buildDoseCard(doseItem, isTaken);
       },
@@ -384,7 +504,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildDoseCard(Map<String, dynamic> doseItem, bool isTaken) {
-    // ... (kode di sini tidak berubah)
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -405,25 +524,28 @@ class _HomePageState extends State<HomePage> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
+          // Jika sudah diminum, onTap dinonaktifkan
           onTap:
               isTaken
                   ? null
                   : () async {
-                    final result = await Navigator.pushNamed(
-                      context,
-                      '/med-info',
-                      arguments: {
-                        'scheduleId': doseItem['scheduleId'],
-                        'name': doseItem['medicineName'],
-                        'dose': doseItem['dose'],
-                        'medicineType': doseItem['medicineType'],
-                        'doseTime': doseItem['displayTime'],
-                      },
-                    );
-                    if (result == true && mounted) {
-                      setState(() {});
-                    }
-                  },
+                      // Navigasi ke halaman detail obat
+                      final result = await Navigator.pushNamed(
+                        context,
+                        '/med-info',
+                        arguments: {
+                          'scheduleId': doseItem['scheduleId'],
+                          'name': doseItem['medicineName'],
+                          'dose': doseItem['dose'],
+                          'medicineType': doseItem['medicineType'],
+                          'doseTime': doseItem['displayTime'],
+                        },
+                      );
+                      // Jika ada perubahan (misal, obat ditandai sudah diminum), perbarui UI
+                      if (result == true && mounted) {
+                        setState(() {});
+                      }
+                    },
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
@@ -484,7 +606,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildEmptyState() {
-    // ... (kode di sini tidak berubah)
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -514,7 +635,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildEmptyScheduleForDay() {
-    // ... (kode di sini tidak berubah)
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 48.0, horizontal: 24.0),
@@ -542,10 +662,10 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// Mengambil progres minum obat untuk dosis yang dijadwalkan pada tanggal tertentu.
   Future<Map<String, dynamic>> _getMedicationProgress(
     List<Map<String, dynamic>> scheduledDoses,
   ) async {
-    // ... (kode di sini tidak berubah)
     int takenCount = 0;
     final Map<String, Map<String, bool>> statusesBySchedule = {};
 
@@ -557,8 +677,10 @@ class _HomePageState extends State<HomePage> {
       };
     }
 
+    // Kumpulkan ID jadwal unik
     final scheduleIds =
         scheduledDoses.map((d) => d['scheduleId'] as String).toSet();
+    // Untuk setiap ID jadwal, ambil status minum obatnya
     for (String id in scheduleIds) {
       final status = await AuthService.getDoseTakenStatus(
         userId: _currentUser!.uid,
@@ -568,6 +690,7 @@ class _HomePageState extends State<HomePage> {
       statusesBySchedule[id] = status;
     }
 
+    // Hitung jumlah dosis yang sudah diminum
     for (var dose in scheduledDoses) {
       if (statusesBySchedule[dose['scheduleId']]?[dose['displayTime']] ==
           true) {

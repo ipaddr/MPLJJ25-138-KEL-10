@@ -21,7 +21,7 @@ class TakePhotoPage extends StatefulWidget {
 
 class _TakePhotoPageState extends State<TakePhotoPage> {
   CameraController? _controller;
-  late Future<void> _initializeControllerFuture;
+  Future<void>? _initializeControllerFuture;
 
   @override
   void initState() {
@@ -36,11 +36,19 @@ class _TakePhotoPageState extends State<TakePhotoPage> {
         (camera) => camera.lensDirection == CameraLensDirection.front,
       );
 
-      _controller = CameraController(frontCamera, ResolutionPreset.medium);
+      _controller = CameraController(
+        frontCamera,
+        ResolutionPreset.medium,
+        enableAudio: false,
+      );
       _initializeControllerFuture = _controller!.initialize();
-      setState(() {});
+      await _initializeControllerFuture;
+
+      if (mounted) {
+        setState(() {});
+      }
     } catch (e) {
-      print('Error initializing camera: $e');
+      debugPrint('Error initializing camera: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Kamera tidak tersedia: $e')),
@@ -55,41 +63,38 @@ class _TakePhotoPageState extends State<TakePhotoPage> {
     super.dispose();
   }
 
-  Future<void> _takePicture(BuildContext context) async {
-    try {
-      await _initializeControllerFuture;
+ Future<void> _takePicture(BuildContext context) async {
+  try {
+    if (_controller == null || !_controller!.value.isInitialized) {
+      throw Exception('Kamera belum siap');
+    }
 
-      final XFile file = await _controller!.takePicture();
+    await _controller!.takePicture().then((file) async {
+      final imagePath = file.path;
+      final exists = await File(imagePath).exists();
+      final size = await File(imagePath).length();
+      print('✅ Foto disimpan: $imagePath | exists: $exists | size: $size bytes');
 
-      final directory = await getTemporaryDirectory();
-      final imagePath = join(directory.path, '${DateTime.now().millisecondsSinceEpoch}.png');
-
-      // Salin ke path baru (opsional, bisa langsung pakai file.path)
-      await file.saveTo(imagePath);
-
-      final result = await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => WaitingPhotoPage(
-            scheduleId: widget.scheduleId,
-            doseTime: widget.doseTime,
-            imagePath: imagePath,
-          ),
-        ),
+await Navigator.pushReplacement(
+  context,
+  MaterialPageRoute(
+    builder: (_) => WaitingPhotoPage(
+      scheduleId: widget.scheduleId,
+      doseTime: widget.doseTime,
+      imagePath: imagePath,
+    ),
+  ),
+);
+    });
+  } catch (e) {
+    debugPrint("❌ Error taking picture: $e");
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal mengambil foto: $e')),
       );
-
-      if (mounted) {
-        Navigator.pop(context, result);
-      }
-    } catch (e) {
-      print("Error taking picture: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal mengambil foto: $e')),
-        );
-      }
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -105,29 +110,22 @@ class _TakePhotoPageState extends State<TakePhotoPage> {
       ),
       body: _controller == null
           ? const Center(child: CircularProgressIndicator())
-          : FutureBuilder<void>(
-              future: _initializeControllerFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.done) {
-                  return Stack(
-                    alignment: Alignment.bottomCenter,
-                    children: [
-                      CameraPreview(_controller!),
-                      Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: FloatingActionButton(
-                          backgroundColor: Colors.white,
-                          onPressed: () => _takePicture(context),
-                          child: const Icon(Icons.camera_alt, color: Colors.black),
-                        ),
+          : (_controller!.value.isInitialized
+              ? Stack(
+                  alignment: Alignment.bottomCenter,
+                  children: [
+                    CameraPreview(_controller!),
+                    Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: FloatingActionButton(
+                        backgroundColor: Colors.white,
+                        onPressed: () => _takePicture(context),
+                        child: const Icon(Icons.camera_alt, color: Colors.black),
                       ),
-                    ],
-                  );
-                } else {
-                  return const Center(child: CircularProgressIndicator());
-                }
-              },
-            ),
+                    ),
+                  ],
+                )
+              : const Center(child: CircularProgressIndicator())),
     );
   }
 }

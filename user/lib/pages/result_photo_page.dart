@@ -1,18 +1,20 @@
-// Path: result_photo_page.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:user/services/auth_service.dart'; // Import AuthService User
-import 'package:firebase_auth/firebase_auth.dart'; // Untuk mendapatkan UID user
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:user/services/auth_service.dart';
 
 class ResultPhotoPage extends StatefulWidget {
   final String scheduleId;
   final String doseTime;
-  final bool isPhotoVerified; // Hasil dari deteksi wajah
+  final bool isPhotoVerified;
+  final String imagePath;
 
   const ResultPhotoPage({
     super.key,
     required this.scheduleId,
     required this.doseTime,
     required this.isPhotoVerified,
+    required this.imagePath,
   });
 
   @override
@@ -23,6 +25,12 @@ class _ResultPhotoPageState extends State<ResultPhotoPage> {
   final User? _currentUser = AuthService.getCurrentUser();
   bool _isSending = false;
 
+  void _cancelVerification() {
+    // Navigasi kembali ke halaman sebelumnya (kemungkinan TakePhotoPage)
+    // dan berikan indikasi bahwa verifikasi dibatalkan/gagal.
+    Navigator.pop(context, false);
+  }
+
   Future<void> _sendVerificationResult() async {
     if (_currentUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -31,48 +39,52 @@ class _ResultPhotoPageState extends State<ResultPhotoPage> {
           backgroundColor: Colors.red,
         ),
       );
-      Navigator.pop(context, false); // Kembali ke Home/login
+      _cancelVerification(); // Kembali jika user tidak login
       return;
     }
 
-    setState(() {
-      _isSending = true;
-    });
+    setState(() => _isSending = true);
 
     try {
-      if (widget.isPhotoVerified) {
-        // Panggil fungsi untuk menandai obat sudah diminum di Firestore
-        await AuthService.updateDoseTakenStatus(
-          userId: _currentUser!.uid,
-          scheduleId: widget.scheduleId,
-          doseTime: widget.doseTime,
-          date: DateTime.now(), // Tanggal saat ini
-          isTaken: true,
-        );
+      // Perbarui status dosis di Firebase
+      await AuthService.updateDoseTakenStatus(
+        userId: _currentUser!.uid,
+        scheduleId: widget.scheduleId,
+        doseTime: widget.doseTime,
+        date: DateTime.now(),
+        isTaken: true,
+      );
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Verifikasi obat berhasil dikirim!',
-              style: TextStyle(color: Colors.white),
-            ),
-            backgroundColor: Colors.green,
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Verifikasi obat berhasil dikirim!',
+            style: TextStyle(color: Colors.white),
           ),
-        );
-        Navigator.pop(
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // --- START NAVIGATION UPDATE ---
+      // Setelah berhasil update status di Firebase, navigasi ke WaitingPhotoPage.
+      // Gunakan pushReplacementNamed untuk membersihkan stack navigasi dari ResultPhotoPage.
+      if (mounted) {
+        Navigator.pushReplacementNamed(
           context,
-          true,
-        ); // Kembali ke home_page dengan status sukses (refresh)
-      } else {
-        // Jika foto tidak terverifikasi, kembali ke halaman sebelumnya dengan pesan gagal
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Verifikasi foto gagal. Silakan coba lagi.'),
-            backgroundColor: Colors.red,
-          ),
+          '/waiting-photo', // Route ke halaman menunggu verifikasi
+          arguments: {
+            'scheduleId': widget.scheduleId,
+            'doseTime': widget.doseTime,
+            'imagePath': widget.imagePath,
+            // isPhotoVerified tidak perlu diteruskan lagi karena di WaitingPhotoPage
+            // kita akan menentukan hasil verifikasi final (misalnya dari AI atau simulasi)
+            // dan langsung mengarahkan ke VerificationDonePage atau kembali ke ResultPhotoPage
+            // jika ada kegagalan verifikasi setelah WaitingPhotoPage.
+          },
         );
-        Navigator.pop(context, false); // Kembali ke TakePhotoPage untuk ulangi
       }
+      // --- END NAVIGATION UPDATE ---
+
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -83,137 +95,114 @@ class _ResultPhotoPageState extends State<ResultPhotoPage> {
           backgroundColor: Colors.red,
         ),
       );
-      Navigator.pop(context, false); // Kembali dengan status gagal
+      _cancelVerification(); // Kembali jika ada error saat mengirim ke Firebase
     } finally {
-      if (mounted) {
-        setState(() {
-          _isSending = false;
-        });
-      }
+      if (mounted) setState(() => _isSending = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool success = widget.isPhotoVerified;
+    final Color primaryColor = success ? const Color(0xFF0072CE) : Colors.red;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () {
-            // Jika foto gagal diverifikasi, tombol kembali akan mengulang proses
-            // Jika sukses, tombol ini seharusnya tidak terlalu relevan setelah pengiriman
-            if (!widget.isPhotoVerified) {
-              Navigator.pop(
-                context,
-                false,
-              ); // Kembali ke take_photo_page untuk ulangi
-            } else {
-              // Jika sudah sukses tapi belum dikirim, atau sudah dikirim, kembali ke home
-              Navigator.pop(context, true); // Kembali ke home_page
-            }
-          },
+          // Ketika tombol kembali di AppBar ditekan, kembali ke halaman sebelumnya (TakePhotoPage)
+          onPressed: () => Navigator.pop(context, success),
         ),
         elevation: 0,
         backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                widget.isPhotoVerified
-                    ? Icons.check_circle_outline
-                    : Icons.cancel_outlined,
+                success ? Icons.check_circle_outline : Icons.cancel_outlined,
                 size: 100,
-                color: widget.isPhotoVerified ? Colors.green : Colors.red,
+                color: success ? Colors.green : Colors.red,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               Text(
-                widget.isPhotoVerified
-                    ? "Foto berhasil diverifikasi!"
-                    : "Foto gagal diverifikasi!",
+                success ? "Foto berhasil diverifikasi!" : "Foto gagal diverifikasi!",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color:
-                      widget.isPhotoVerified
-                          ? const Color(0xFF0072CE)
-                          : Colors.red,
+                  color: primaryColor,
                 ),
               ),
               const SizedBox(height: 12),
               Text(
-                widget.isPhotoVerified
+                success
                     ? "Wajah Anda terdeteksi dengan jelas. Silakan kirim verifikasi."
                     : "Wajah tidak terdeteksi atau foto tidak jelas. Silakan ulangi.",
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 14, color: Colors.grey),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
+              if (widget.imagePath.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(
+                    File(widget.imagePath),
+                    width: 200,
+                    height: 200,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 100),
+                  ),
+                ),
+              const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed:
-                      _isSending
-                          ? null
-                          : () {
-                            if (widget.isPhotoVerified) {
-                              _sendVerificationResult(); // Jika berhasil, kirim
-                            } else {
-                              Navigator.pop(
-                                context,
-                                false,
-                              ); // Jika gagal, kembali untuk ulangi
-                            }
-                          },
+                  onPressed: _isSending
+                      ? null
+                      : () {
+                          if (success) {
+                            // Jika foto berhasil diverifikasi, kirim hasilnya (yang akan navigasi)
+                            _sendVerificationResult();
+                          } else {
+                            // Jika foto gagal diverifikasi, ulangi proses selfie
+                            _cancelVerification();
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor:
-                        widget.isPhotoVerified
-                            ? const Color(0xFF0072CE)
-                            : Colors.red, // Warna tombol dinamis
+                    backgroundColor: primaryColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child:
-                      _isSending
-                          ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                          : Text(
-                            widget.isPhotoVerified
-                                ? "Kirim Verifikasi"
-                                : "Ulangi Selfie", // Teks tombol dinamis
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.white,
-                            ),
+                  child: _isSending
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
                           ),
+                        )
+                      : Text(
+                          success ? "Kirim Verifikasi" : "Ulangi Selfie",
+                          style: const TextStyle(fontSize: 16, color: Colors.white),
+                        ),
                 ),
               ),
-              if (widget.isPhotoVerified) ...[
-                // Hanya tampilkan tombol "Ulangi" jika foto sudah terverifikasi (opsi lain)
+              // Tombol "Ulangi" hanya muncul jika verifikasi berhasil.
+              // Jika gagal, tombol utama sudah menjadi "Ulangi Selfie".
+              if (success) ...[
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.pop(
-                        context,
-                        false,
-                      ); // Kembali ke TakePhotoPage untuk ulangi
-                    },
+                    onPressed: _isSending ? null : _cancelVerification, // Navigasi kembali untuk ambil foto baru
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       side: const BorderSide(color: Colors.grey),
@@ -222,7 +211,7 @@ class _ResultPhotoPageState extends State<ResultPhotoPage> {
                       ),
                     ),
                     child: const Text(
-                      'Ulangi',
+                      'Ulangi Foto', // Teks yang lebih spesifik
                       style: TextStyle(fontSize: 16, color: Colors.grey),
                     ),
                   ),
