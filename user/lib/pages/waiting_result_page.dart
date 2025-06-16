@@ -1,10 +1,19 @@
+import 'dart:io'; // Perlu diimpor untuk File
 import 'package:flutter/material.dart';
-import 'verification_done_page.dart';
+import 'package:user/pages/verification_done_page.dart'; // Import VerificationDonePage
+import 'package:user/pages/result_photo_page.dart'; // Import ResultPhotoPage jika diperlukan
 
-class WaitingResultPage extends StatefulWidget {
+class WaitingResultPage extends StatefulWidget { // Nama kelas tetap WaitingResultPage
+  final String scheduleId; // <<-- DITAMBAHKAN
+  final String doseTime;   // <<-- DITAMBAHKAN
   final String imagePath;
 
-  const WaitingResultPage({super.key, required this.imagePath});
+  const WaitingResultPage({
+    super.key,
+    required this.scheduleId, // <<-- DITAMBAHKAN
+    required this.doseTime,   // <<-- DITAMBAHKAN
+    required this.imagePath,
+  });
 
   @override
   State<WaitingResultPage> createState() => _WaitingResultPageState();
@@ -14,12 +23,42 @@ class _WaitingResultPageState extends State<WaitingResultPage> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 2), () {
+    // Simulasi proses verifikasi AI atau backend
+    // Setelah delay, kita akan navigasi ke halaman berikutnya
+    Future.delayed(const Duration(seconds: 3), () { // Durasi simulasi bisa disesuaikan
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const VerificationDonePage()),
-        );
+        // --- LOGIKA SIMULASI HASIL VERIFIKASI ---
+        // Di aplikasi nyata, di sini Anda akan memanggil layanan backend/AI
+        // untuk benar-benar memverifikasi foto dan mendapatkan hasilnya.
+        // Untuk tujuan demo/pengembangan, kita asumsikan selalu sukses.
+        bool isAIVerified = true; // Ganti ini dengan hasil sebenarnya dari API verifikasi AI Anda
+
+        if (isAIVerified) {
+          // Jika verifikasi AI berhasil, navigasi ke VerificationDonePage
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => VerificationDonePage(
+                scheduleId: widget.scheduleId, // Teruskan scheduleId
+                doseTime: widget.doseTime, // Teruskan doseTime
+              ),
+            ),
+          );
+        } else {
+          // Jika verifikasi AI gagal, navigasi kembali ke ResultPhotoPage
+          // dengan status gagal untuk memungkinkan pengguna mencoba lagi.
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ResultPhotoPage(
+                scheduleId: widget.scheduleId,
+                doseTime: widget.doseTime,
+                isPhotoVerified: false, // Beri tahu ResultPhotoPage bahwa ini gagal
+                imagePath: widget.imagePath,
+              ),
+            ),
+          );
+        }
       }
     });
   }
@@ -33,7 +72,7 @@ class _WaitingResultPageState extends State<WaitingResultPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Ganti background dengan preview foto yang diambil
+              // Tampilkan preview foto yang diambil dengan sedikit transparansi
               Stack(
                 alignment: Alignment.center,
                 children: [
@@ -45,7 +84,7 @@ class _WaitingResultPageState extends State<WaitingResultPage> {
                       fit: BoxFit.cover,
                     ),
                   ),
-                  const FaceDots(),
+                  const FaceDots(), // Pastikan FaceDots class tersedia atau diimpor
                 ],
               ),
               const SizedBox(height: 40),
@@ -63,6 +102,8 @@ class _WaitingResultPageState extends State<WaitingResultPage> {
   }
 }
 
+// Pastikan FaceDots class juga ada di file waiting_result_page.dart jika tidak diimpor dari tempat lain.
+// Jika sudah ada di file terpisah dan diimpor, Anda bisa menghapus bagian ini.
 class FaceDots extends StatelessWidget {
   const FaceDots({super.key});
 

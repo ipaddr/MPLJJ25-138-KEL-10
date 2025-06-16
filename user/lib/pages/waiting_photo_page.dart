@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
+
 import 'result_photo_page.dart';
 
 class WaitingPhotoPage extends StatefulWidget {
   final String scheduleId;
   final String doseTime;
-  final String imagePath; // Tambahkan imagePath agar preview bisa ditampilkan
+  final String imagePath;
 
   const WaitingPhotoPage({
     super.key,
@@ -22,6 +24,7 @@ class WaitingPhotoPage extends StatefulWidget {
 class _WaitingPhotoPageState extends State<WaitingPhotoPage>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  late Animation<double> _animation;
   bool _isVerificationSuccessful = false;
 
   @override
@@ -30,34 +33,38 @@ class _WaitingPhotoPageState extends State<WaitingPhotoPage>
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat();
+      duration: const Duration(seconds: 1),
+    )..repeat(reverse: true);
+
+    _animation = Tween<double>(begin: 0.4, end: 1.0).animate(_controller);
 
     _performFaceVerification();
   }
 
   Future<void> _performFaceVerification() async {
+    // Simulasi proses verifikasi wajah
     await Future.delayed(const Duration(seconds: 3));
 
-    final bool simulatedResult =
-        DateTime.now().millisecond % 10 < 8; // 80% berhasil
+    final bool simulatedResult = Random().nextInt(10) < 8;
 
-    if (mounted) {
-      setState(() {
-        _isVerificationSuccessful = simulatedResult;
-      });
+    if (!mounted) return;
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ResultPhotoPage(
-            scheduleId: widget.scheduleId,
-            doseTime: widget.doseTime,
-            isPhotoVerified: _isVerificationSuccessful,
-          ),
+    setState(() {
+      _isVerificationSuccessful = simulatedResult;
+    });
+
+    // Navigasi ke halaman hasil verifikasi
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ResultPhotoPage(
+          scheduleId: widget.scheduleId,
+          doseTime: widget.doseTime,
+          isPhotoVerified: _isVerificationSuccessful,
+          imagePath: widget.imagePath,
         ),
-      );
-    }
+      ),
+    );
   }
 
   @override
@@ -68,54 +75,73 @@ class _WaitingPhotoPageState extends State<WaitingPhotoPage>
 
   @override
   Widget build(BuildContext context) {
+    final File imageFile = File(widget.imagePath);
+    final bool imageExists = imageFile.existsSync();
+
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  Opacity(
-                    opacity: 0.4,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: Image.file(
-                        File(widget.imagePath),
-                        height: 320,
-                        width: 240,
-                        fit: BoxFit.cover,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Opacity(
+                      opacity: 0.3,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: imageExists
+                            ? Image.file(
+                                imageFile,
+                                height: screenHeight * 0.45,
+                                width: screenWidth * 0.6,
+                                fit: BoxFit.cover,
+                              )
+                            : const Icon(Icons.broken_image, size: 120),
                       ),
                     ),
-                  ),
-                  const FaceDots(),
-                ],
-              ),
-              const SizedBox(height: 24),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 32.0),
-                child: Text(
+                    FadeTransition(
+                      opacity: _animation,
+                      child: const FaceDots(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const Text(
                   'Memverifikasi foto Anda...\nMohon tunggu sebentar',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontFamily: 'Roboto',
                     fontSize: 16,
-                    color: Colors.black45,
+                    color: Colors.black54,
                     fontWeight: FontWeight.w400,
                     height: 1.4,
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  Color(0xFF0072CE),
+                const SizedBox(height: 24),
+                const CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0072CE)),
+                  strokeWidth: 3,
                 ),
-                strokeWidth: 3,
-              ),
-            ],
+                const SizedBox(height: 24),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Batalkan',
+                    style: TextStyle(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -151,8 +177,8 @@ class FaceDots extends StatelessWidget {
       child: Container(
         width: 12,
         height: 12,
-        decoration: const BoxDecoration(
-          color: Colors.black,
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.8),
           shape: BoxShape.circle,
         ),
       ),

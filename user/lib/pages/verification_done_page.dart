@@ -2,14 +2,14 @@
 import 'package:flutter/material.dart';
 
 class VerificationDonePage extends StatelessWidget {
-  // Anda bisa meneruskan data jadwal jika perlu ditampilkan di sini
-  // final String medicineName;
-  // final String doseTime;
+  // Sekarang menerima data jadwal
+  final String scheduleId; // <<-- DITAMBAHKAN
+  final String doseTime;   // <<-- DITAMBAHKAN
 
   const VerificationDonePage({
     super.key,
-    // this.medicineName,
-    // this.doseTime,
+    required this.scheduleId, // Wajib
+    required this.doseTime,   // Wajib
   });
 
   @override
@@ -35,9 +35,10 @@ class VerificationDonePage extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
-              const Text(
-                "Terima kasih telah melakukan verifikasi. Obat Anda telah ditandai diminum.",
-                style: TextStyle(fontSize: 14, color: Colors.grey),
+              Text(
+                // Contoh menampilkan detail obat yang diverifikasi
+                "Terima kasih telah melakukan verifikasi untuk obat pada pukul $doseTime. Obat Anda telah ditandai diminum.",
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 40),
@@ -56,7 +57,7 @@ class VerificationDonePage extends StatelessWidget {
                     Navigator.pushNamedAndRemoveUntil(
                       context,
                       '/home', // Kembali ke home_page
-                      (route) => false,
+                      (route) => false, // Hapus semua route di atasnya
                     );
                   },
                   child: const Text(
