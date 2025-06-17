@@ -8,6 +8,7 @@ import '../../main.dart'; // Supaya bisa akses flutterLocalNotificationsPlugin
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:permission_handler/permission_handler.dart'; // <-- TAMBAHKAN INI
 
 // Halaman lain yang diimpor
 import 'profile_user.dart';
@@ -33,28 +34,46 @@ class _HomePageState extends State<HomePage> {
     _checkCurrentUserAndLoadData();
     // Mengatur locale default untuk format tanggal dan waktu menjadi Bahasa Indonesia
     Intl.defaultLocale = 'id_ID';
-    // Meminta izin notifikasi saat aplikasi dimulai (opsional, bisa juga di layar onboarding)
+    // Meminta izin notifikasi saat aplikasi dimulai
     _requestNotificationPermissions();
   }
 
-  // Meminta izin notifikasi untuk Android 13+
+  // Meminta izin notifikasi untuk Android 13+ DAN izin SCHEDULE_EXACT_ALARM
   void _requestNotificationPermissions() async {
-    // Hanya perlu untuk Android 13 (API 33) ke atas
+    // Permintaan izin notifikasi umum untuk Android 13 (API 33) ke atas
     if (Theme.of(context).platform == TargetPlatform.android) {
       final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
           flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
 
       if (androidImplementation != null) {
+        // Request POST_NOTIFICATIONS permission for Android 13+
         final bool? granted = await androidImplementation.requestNotificationsPermission();
         if (granted != null && granted) {
-          print("Izin notifikasi Android diberikan.");
+          print("DEBUG: Izin notifikasi umum Android diberikan.");
         } else {
-          print("Izin notifikasi Android ditolak.");
+          print("WARN: Izin notifikasi umum Android ditolak.");
         }
       }
     }
-    // Untuk iOS, izin diminta pada InitializationSettings di main.dart
+
+    // Permintaan izin SCHEDULE_EXACT_ALARM (untuk Android 12+)
+    // Ini adalah izin runtime, jadi harus diminta dari pengguna
+    final status = await Permission.scheduleExactAlarm.status;
+    if (status.isDenied || status.isRestricted || status.isLimited) {
+      print("DEBUG: Meminta izin SCHEDULE_EXACT_ALARM...");
+      final result = await Permission.scheduleExactAlarm.request();
+      if (result.isGranted) {
+        print("DEBUG: Izin SCHEDULE_EXACT_ALARM diberikan.");
+      } else {
+        print("WARN: Izin SCHEDULE_EXACT_ALARM ditolak. Fitur pengingat tepat mungkin tidak berfungsi.");
+        // Anda bisa menampilkan dialog atau snackbar untuk memberitahu pengguna
+        // bahwa mereka harus mengaktifkannya secara manual dari pengaturan aplikasi.
+        // openAppSettings(); // Membuka pengaturan aplikasi
+      }
+    } else if (status.isGranted) {
+      print("DEBUG: Izin SCHEDULE_EXACT_ALARM sudah diberikan.");
+    }
   }
 
   void _checkCurrentUserAndLoadData() {
@@ -79,52 +98,75 @@ class _HomePageState extends State<HomePage> {
 
   /// Menjadwalkan notifikasi pengingat minum obat.
   /// Notifikasi akan dijadwalkan 5 menit sebelum waktu dosis yang sebenarnya.
-  /// Notifikasi tidak akan dijadwalkan jika waktu pengingat sudah lewat.
-  Future<void> scheduleReminderNotification({
-    required String medicineName,
-    required String doseTime,
-    required DateTime scheduledDateTime,
-  }) async {
-    // Hitung waktu notifikasi = 5 menit sebelum waktu minum obat yang dijadwalkan
-    final reminderTime = scheduledDateTime.subtract(const Duration(minutes: 5));
+  /// Jika waktu pengingat sudah lewat, akan dijadwalkan untuk hari berikutnya.
+   // ... (kode di atas) ...
 
-    // Jangan jadwalkan notifikasi jika waktu pengingat sudah lewat dari waktu sekarang
-    // Ini adalah filter utama untuk notifikasi yang sudah tidak relevan.
-    if (reminderTime.isBefore(tz.TZDateTime.now(tz.local))) {
-      print('Waktu pengingat untuk $medicineName pada $doseTime sudah lewat. Tidak dijadwalkan.');
-      return;
-    }
+Future<void> scheduleReminderNotification({
+  required String medicineName,
+  required String doseTime,
+  required DateTime scheduledDateTime, // Ini adalah waktu dosis yang sebenarnya
+}) async {
+  // Hitung waktu notifikasi = 5 menit sebelum waktu minum obat yang dijadwalkan
+  final reminderTime = scheduledDateTime.subtract(const Duration(minutes: 5));
 
-    // Ambil pesan notifikasi dari GeminiService
-    final message = await GeminiService.getReminderMessage(medicineName, doseTime);
+  // Dapatkan waktu sekarang di zona waktu lokal
+  final now = tz.TZDateTime.now(tz.local);
 
-    // Jadwalkan notifikasi lokal
-    await flutterLocalNotificationsPlugin.zonedSchedule(
-      reminderTime.hashCode, // ID unik untuk notifikasi ini (gunakan hashCode untuk unik)
-      'Pengingat Minum Obat', // Judul notifikasi
-      message, // Pesan notifikasi dari Gemini
-      tz.TZDateTime.from(reminderTime, tz.local), // Waktu notifikasi dalam zona waktu lokal
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'reminder_channel', // ID Channel Android
-          'Pengingat Obat', // Nama Channel Android
-          channelDescription: 'Channel untuk notifikasi pengingat minum obat', // Deskripsi Channel
-          importance: Importance.max, // Pentingnya notifikasi (maksimal)
-          priority: Priority.high, // Prioritas notifikasi (tinggi)
-          playSound: true, // Putar suara saat notifikasi muncul
-          // Anda bisa menambahkan ikon kecil di sini jika diinginkan
-          // smallIcon: '@mipmap/ic_launcher',
-        ),
-      ),
-      androidAllowWhileIdle: true, // Izinkan notifikasi muncul bahkan saat perangkat dalam keadaan idle
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      // matchDateTimeComponents: DateTimeComponents.time, // Jika ingin notifikasi berulang harian
-      // Catatan: Jika ingin notifikasi berulang harian, Anda perlu strategi yang berbeda
-      // untuk ID notifikasi dan tidak membatalkan semua setiap kali build.
-    );
-    print('Notifikasi dijadwalkan untuk $medicineName pada ${DateFormat.Hm().format(reminderTime)}');
+  // Variabel untuk waktu notifikasi yang akan digunakan
+  tz.TZDateTime finalScheduledNotificationTime;
+
+  // Logika untuk menjadwalkan notifikasi jika waktu pengingat sudah lewat
+  if (reminderTime.isBefore(now)) {
+    // Jika waktu pengingat sudah lewat hari ini, jadwalkan untuk hari berikutnya pada waktu yang sama
+    finalScheduledNotificationTime = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      reminderTime.hour,
+      reminderTime.minute,
+      reminderTime.second,
+    ).add(const Duration(days: 1)); // Tambah 1 hari
+    print('DEBUG: Waktu pengingat untuk $medicineName pada $doseTime sudah lewat. Dijadwalkan untuk besok pada ${DateFormat.Hm().format(finalScheduledNotificationTime)}.');
+  } else {
+    // Jika waktu pengingat masih di masa depan hari ini, gunakan waktu tersebut
+    finalScheduledNotificationTime = tz.TZDateTime.from(reminderTime, tz.local);
+    print('DEBUG: Menjadwalkan notifikasi untuk $medicineName pada ${DateFormat.Hm().format(finalScheduledNotificationTime)}.');
   }
+
+  // Ambil pesan notifikasi dari GeminiService
+  final message = await GeminiService.getReminderMessage(medicineName, doseTime);
+
+  // Jadwalkan notifikasi lokal
+  await flutterLocalNotificationsPlugin.zonedSchedule(
+    // ID unik untuk notifikasi ini
+    '${scheduledDateTime.toIso8601String()}_${medicineName}_$doseTime'.hashCode,
+    'Pengingat Minum Obat', // Judul notifikasi
+    message, // Pesan notifikasi dari Gemini
+    finalScheduledNotificationTime, // Waktu notifikasi yang telah disesuaikan
+    const NotificationDetails( // <-- Argumen ke-5: NotificationDetails
+      android: AndroidNotificationDetails(
+        'reminder_channel',
+        'Pengingat Obat',
+        channelDescription: 'Channel untuk notifikasi pengingat minum obat',
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: true,
+      ),
+      // Untuk iOS, jika Anda perlu pengaturan serupa, gunakan:
+      // iOS: DarwinNotificationDetails(
+      //   presentAlert: true,
+      //   presentBadge: true,
+      //   presentSound: true,
+      //   interruptionLevel: InterruptionLevel.active,
+      // ),
+    ), // <-- PENUTUP NotificationDetails
+    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, // <-- INI ADALAH NAMED ARGUMENT SETELAH NOTIFICATIONDETAILS
+    // matchDateTimeComponents: DateTimeComponents.time, // Jika ingin notifikasi berulang harian
+  ); // <-- PENUTUP zonedSchedule. Pastikan ini ada dan koma di atasnya benar.
+
+  print('SUCCESS: Notifikasi dijadwalkan untuk $medicineName pada ${DateFormat.Hm().format(finalScheduledNotificationTime)} (Aktual: ${DateFormat.Hm().format(scheduledDateTime)})');
+}
 
   @override
   Widget build(BuildContext context) {
@@ -165,6 +207,9 @@ class _HomePageState extends State<HomePage> {
           // --- Penjadwalan Notifikasi ---
           // Penting: Batalkan semua notifikasi yang telah dijadwalkan sebelumnya untuk menghindari duplikasi.
           // Ini sangat krusial karena StreamBuilder bisa rebuild beberapa kali.
+          // Namun, berhati-hatilah dengan `cancelAll()`. Jika Anda memiliki notifikasi lain
+          // yang tidak terkait dengan jadwal obat, mereka juga akan dibatalkan.
+          // Pertimbangkan untuk membatalkan notifikasi hanya dengan ID tertentu jika memungkinkan.
           flutterLocalNotificationsPlugin.cancelAll(); 
           
           for (final schedule in activeSchedulesToday) {
