@@ -293,8 +293,9 @@ class AuthService {
 
         time = time.add(Duration(hours: i * intervalHours));
 
-        if (time.isBefore(DateTime.now())) {
-          time = time.add(const Duration(days: 1));
+        // Menggunakan tz.TZDateTime.now(tz.local) untuk perbandingan zona waktu yang benar
+        if (time.isBefore(tz.TZDateTime.now(tz.local))) {
+          time = time.add(const Duration(days: 1)); // Jadwalkan untuk hari berikutnya jika sudah lewat
         }
         scheduledTimes.add(time);
       }
@@ -318,6 +319,7 @@ class AuthService {
           scheduledTime.second,
         );
 
+        // Perbandingan juga menggunakan tz.TZDateTime.now(tz.local)
         if (notificationDateTime.isAfter(tz.TZDateTime.now(tz.local))) {
           await localNotificationsPlugin.zonedSchedule(
             '$id-$day-$i'.hashCode,
@@ -326,8 +328,9 @@ class AuthService {
             notificationDateTime,
             platformChannelSpecifics,
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            uiLocalNotificationDateInterpretation:
-                UILocalNotificationDateInterpretation.absoluteTime,
+            // >>>>>>>>> BARIS INI DIHAPUS <<<<<<<<<
+            // uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+            // >>>>>>>>> BARIS INI DIHAPUS <<<<<<<<<
             payload: '$id|${doseTime}|$medicineName',
           );
           print(

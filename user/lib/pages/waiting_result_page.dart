@@ -3,15 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:user/pages/verification_done_page.dart'; // Import VerificationDonePage
 import 'package:user/pages/result_photo_page.dart'; // Import ResultPhotoPage jika diperlukan
 
-class WaitingResultPage extends StatefulWidget { // Nama kelas tetap WaitingResultPage
+class WaitingResultPage extends StatefulWidget {
+  // Nama kelas tetap WaitingResultPage
   final String scheduleId; // <<-- DITAMBAHKAN
-  final String doseTime;   // <<-- DITAMBAHKAN
+  final String doseTime; // <<-- DITAMBAHKAN
   final String imagePath;
 
   const WaitingResultPage({
     super.key,
     required this.scheduleId, // <<-- DITAMBAHKAN
-    required this.doseTime,   // <<-- DITAMBAHKAN
+    required this.doseTime, // <<-- DITAMBAHKAN
     required this.imagePath,
   });
 
@@ -25,23 +26,26 @@ class _WaitingResultPageState extends State<WaitingResultPage> {
     super.initState();
     // Simulasi proses verifikasi AI atau backend
     // Setelah delay, kita akan navigasi ke halaman berikutnya
-    Future.delayed(const Duration(seconds: 3), () { // Durasi simulasi bisa disesuaikan
+    Future.delayed(const Duration(seconds: 3), () {
+      // Durasi simulasi bisa disesuaikan
       if (mounted) {
         // --- LOGIKA SIMULASI HASIL VERIFIKASI ---
         // Di aplikasi nyata, di sini Anda akan memanggil layanan backend/AI
         // untuk benar-benar memverifikasi foto dan mendapatkan hasilnya.
         // Untuk tujuan demo/pengembangan, kita asumsikan selalu sukses.
-        bool isAIVerified = true; // Ganti ini dengan hasil sebenarnya dari API verifikasi AI Anda
+        bool isAIVerified =
+            true; // Ganti ini dengan hasil sebenarnya dari API verifikasi AI Anda
 
         if (isAIVerified) {
           // Jika verifikasi AI berhasil, navigasi ke VerificationDonePage
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => VerificationDonePage(
-                scheduleId: widget.scheduleId, // Teruskan scheduleId
-                doseTime: widget.doseTime, // Teruskan doseTime
-              ),
+              builder:
+                  (_) => VerificationDonePage(
+                    scheduleId: widget.scheduleId, // Teruskan scheduleId
+                    doseTime: widget.doseTime, // Teruskan doseTime
+                  ),
             ),
           );
         } else {
@@ -50,12 +54,14 @@ class _WaitingResultPageState extends State<WaitingResultPage> {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => ResultPhotoPage(
-                scheduleId: widget.scheduleId,
-                doseTime: widget.doseTime,
-                isPhotoVerified: false, // Beri tahu ResultPhotoPage bahwa ini gagal
-                imagePath: widget.imagePath,
-              ),
+              builder:
+                  (_) => ResultPhotoPage(
+                    scheduleId: widget.scheduleId,
+                    doseTime: widget.doseTime,
+                    isPhotoVerified:
+                        false, // Beri tahu ResultPhotoPage bahwa ini gagal
+                    imagePath: widget.imagePath,
+                  ),
             ),
           );
         }
