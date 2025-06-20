@@ -37,6 +37,8 @@ dependencies:
   # Package tambahan untuk kompatibilitas
   flutter_plugin_android_lifecycle: ^2.0.7 # Ditambahkan untuk mendukung lifecycle
   firebase_storage: ^12.4.6
+  intl: ^0.19.0
+  flutter_launcher_icons: ^0.14.4
 
 dev_dependencies:
   flutter_test:
@@ -82,3 +84,8 @@ flutter:
     - assets/images/calendar_icon.png
     - assets/images/welcome_scr.png
     - assets/images/avatar.png
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/welcome_scr.png"

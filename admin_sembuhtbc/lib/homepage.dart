@@ -124,28 +124,46 @@ class HomePage extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            // Top icons (notification and settings)
+            // Top icons
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 20.0,
                 vertical: 12.0,
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  // --- TOMBOL BARU DITAMBAHKAN DI SINI ---
                   IconButton(
+                    tooltip: 'Cari Pasien',
+                    icon: const Icon(
+                      Icons.search,
+                      color: Color(0xFF0072CE),
+                      size: 28,
+                    ),
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/looking-user');
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: 'Verifikasi Pasien',
                     icon: const Icon(
                       Icons.notifications_none,
                       color: Colors.amber,
+                      size: 28,
                     ),
                     onPressed: () {
                       Navigator.pushReplacementNamed(context, '/verify');
                     },
                   ),
+                  const SizedBox(width: 8),
                   IconButton(
+                    tooltip: 'Profil Admin',
                     icon: const Icon(
                       Icons.settings_outlined,
                       color: Colors.black54,
+                      size: 28,
                     ),
                     onPressed: () {
                       Navigator.pushReplacementNamed(context, '/profile');
