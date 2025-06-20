@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:user/services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:user/services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -13,39 +14,47 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
   bool _obscurePassword = true;
   bool _isLoading = false;
-  final _formKey = GlobalKey<FormState>();
 
   bool _isValidEmail(String email) {
     return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
 
+  Future<void> _saveLoginStatus(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', true);
+    await prefs.setString('userId', uid);
+    debugPrint('DEBUG: Login berhasil, UID disimpan: $uid');
+  }
+
+  Future<void> _clearLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', false);
+    await prefs.remove('userId');
+    debugPrint('DEBUG: Status login dibersihkan dari SharedPreferences');
+  }
+
   void _handleLogin() async {
     if (!_formKey.currentState!.validate()) {
-      _showSnackBar(
-        message: 'Harap perbaiki input yang salah',
-        backgroundColor: Colors.red,
-      );
+      _showSnackBar('Harap perbaiki input yang salah', Colors.red);
       return;
     }
 
+    setState(() => _isLoading = true);
+
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-
-    setState(() => _isLoading = true);
 
     try {
       final credential = await AuthService.signInWithEmail(email, password);
       final user = credential?.user;
 
-      if (user == null) {
-        throw Exception('Gagal mendapatkan user.');
-      }
+      if (user == null) throw Exception('Gagal mendapatkan user.');
 
-      final uid = user.uid;
-      final userDoc =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
 
       if (!userDoc.exists) {
         throw Exception('User tidak ditemukan di Firestore.');
@@ -54,22 +63,18 @@ class _LoginPageState extends State<LoginPage> {
       final isVerified = userDoc.data()?['isVerified'] == true;
 
       if (!isVerified) {
-        _showSnackBar(
-          message: 'Akun Anda belum diverifikasi oleh admin',
-          backgroundColor: Colors.orange,
-        );
+        _showSnackBar('Akun Anda belum diverifikasi oleh admin', Colors.orange);
+        await _clearLoginStatus();
       } else {
-        if (context.mounted) {
-          Navigator.pushReplacementNamed(context, '/home');
-        }
+        await _saveLoginStatus(user.uid);
+        if (mounted) Navigator.pushReplacementNamed(context, '/home');
       }
     } on FirebaseAuthException catch (e) {
-      _showSnackBar(
-        message: 'Login gagal: ${_handleFirebaseError(e)}',
-        backgroundColor: Colors.red,
-      );
+      _showSnackBar('Login gagal: ${_handleFirebaseError(e)}', Colors.red);
+      await _clearLoginStatus();
     } catch (e) {
-      _showSnackBar(message: 'Login error: $e', backgroundColor: Colors.red);
+      _showSnackBar('Login error: $e', Colors.red);
+      await _clearLoginStatus();
     } finally {
       setState(() => _isLoading = false);
     }
@@ -92,19 +97,14 @@ class _LoginPageState extends State<LoginPage> {
       case 'invalid-credential':
         return 'Email atau password salah';
       default:
-        return 'Terjadi kesalahan: ${e.message ?? 'Silakan coba lagi'}';
+        return e.message ?? 'Terjadi kesalahan. Silakan coba lagi';
     }
   }
 
-  void _showSnackBar({
-    required String message,
-    required Color backgroundColor,
-    int durationSeconds = 3,
-  }) {
+  void _showSnackBar(String message, Color backgroundColor) {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).clearSnackBars();
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -118,7 +118,7 @@ class _LoginPageState extends State<LoginPage> {
         backgroundColor: backgroundColor,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: Duration(seconds: durationSeconds),
+        duration: const Duration(seconds: 3),
         action: SnackBarAction(
           label: 'Tutup',
           textColor: Colors.white,
@@ -142,7 +142,7 @@ class _LoginPageState extends State<LoginPage> {
             padding: EdgeInsets.zero,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
-              side: BorderSide(color: Colors.grey.shade300, width: 1),
+              side: BorderSide(color: Colors.grey.shade300),
             ),
           ),
           onPressed: () {
@@ -150,35 +150,9 @@ class _LoginPageState extends State<LoginPage> {
               Navigator.pop(context);
             }
           },
-          child: const Icon(Icons.arrow_back, size: 24, color: Colors.black),
+          child: const Icon(Icons.arrow_back, color: Colors.black),
         ),
       ),
-    );
-  }
-
-  Widget _buildWelcomeText() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Selamat datang kembali!',
-          style: TextStyle(
-            fontFamily: 'Urbanist',
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0072CE),
-          ),
-        ),
-        const Text(
-          'Senang melihat Anda lagi!',
-          style: TextStyle(
-            fontFamily: 'Urbanist',
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0072CE),
-          ),
-        ),
-      ],
     );
   }
 
@@ -188,26 +162,15 @@ class _LoginPageState extends State<LoginPage> {
       child: TextFormField(
         controller: _emailController,
         keyboardType: TextInputType.emailAddress,
-        style: const TextStyle(fontFamily: 'Urbanist', fontSize: 15),
         decoration: InputDecoration(
           labelText: 'Masukkan email Anda',
-          labelStyle: const TextStyle(
-            fontFamily: 'Urbanist',
-            color: Color.fromARGB(255, 128, 128, 128),
-          ),
+          labelStyle: const TextStyle(fontFamily: 'Urbanist'),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          contentPadding: const EdgeInsets.symmetric(
-            vertical: 16,
-            horizontal: 16,
-          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
         validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Email harus diisi';
-          }
-          if (!_isValidEmail(value)) {
-            return 'Masukkan email yang valid';
-          }
+          if (value == null || value.isEmpty) return 'Email harus diisi';
+          if (!_isValidEmail(value)) return 'Masukkan email yang valid';
           return null;
         },
       ),
@@ -220,35 +183,19 @@ class _LoginPageState extends State<LoginPage> {
       child: TextFormField(
         controller: _passwordController,
         obscureText: _obscurePassword,
-        style: const TextStyle(fontFamily: 'Urbanist', fontSize: 15),
         decoration: InputDecoration(
           labelText: 'Masukkan sandi Anda',
-          labelStyle: const TextStyle(
-            fontFamily: 'Urbanist',
-            color: Color.fromARGB(255, 128, 128, 128),
-          ),
+          labelStyle: const TextStyle(fontFamily: 'Urbanist'),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
           suffixIcon: IconButton(
-            icon: Icon(
-              _obscurePassword ? Icons.visibility_off : Icons.visibility,
-              color: Colors.grey,
-            ),
-            onPressed: () {
-              setState(() => _obscurePassword = !_obscurePassword);
-            },
+            icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
           ),
-          contentPadding: const EdgeInsets.symmetric(
-            vertical: 16,
-            horizontal: 16,
-          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         ),
         validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'Password harus diisi';
-          }
-          if (value.length < 6) {
-            return 'Password minimal 6 karakter';
-          }
+          if (value == null || value.isEmpty) return 'Password harus diisi';
+          if (value.length < 6) return 'Password minimal 6 karakter';
           return null;
         },
       ),
@@ -262,29 +209,19 @@ class _LoginPageState extends State<LoginPage> {
         onPressed: _isLoading ? null : _handleLogin,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF0072CE),
-          padding: const EdgeInsets.symmetric(horizontal: 105.5, vertical: 19),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          padding: const EdgeInsets.symmetric(vertical: 19),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
-        child:
-            _isLoading
-                ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
-                : const Text(
-                  'Login',
-                  style: TextStyle(
-                    fontFamily: 'Urbanist',
-                    color: Colors.white,
-                    fontSize: 16,
-                  ),
-                ),
+        child: _isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+              )
+            : const Text(
+                'Login',
+                style: TextStyle(fontFamily: 'Urbanist', fontSize: 16, color: Colors.white),
+              ),
       ),
     );
   }
@@ -292,7 +229,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // Tambahkan baris ini
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -303,7 +240,24 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 20),
                 _buildBackButton(),
                 const SizedBox(height: 20),
-                _buildWelcomeText(),
+                const Text(
+                  'Selamat datang kembali!',
+                  style: TextStyle(
+                    fontFamily: 'Urbanist',
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0072CE),
+                  ),
+                ),
+                const Text(
+                  'Senang melihat Anda lagi!',
+                  style: TextStyle(
+                    fontFamily: 'Urbanist',
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0072CE),
+                  ),
+                ),
                 const SizedBox(height: 30),
                 _buildEmailField(),
                 const SizedBox(height: 20),
@@ -312,9 +266,7 @@ class _LoginPageState extends State<LoginPage> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/forgot-password');
-                    },
+                    onPressed: () => Navigator.pushNamed(context, '/forgot-password'),
                     child: const Text(
                       'Lupa Sandi?',
                       style: TextStyle(
@@ -331,10 +283,7 @@ class _LoginPageState extends State<LoginPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
-                      "Belum memiliki akun?",
-                      style: TextStyle(fontFamily: 'Urbanist'),
-                    ),
+                    const Text("Belum memiliki akun?", style: TextStyle(fontFamily: 'Urbanist')),
                     const SizedBox(width: 5),
                     GestureDetector(
                       onTap: () => Navigator.pushNamed(context, '/register'),

@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.user">
 
-    <!-- ✅ Izin penggunaan kamera dan penyimpanan -->
+    <!-- ✅ Izin untuk fitur aplikasi -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
@@ -9,37 +9,39 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
-    <!-- ✅ Menyatakan aplikasi butuh kamera -->
+    <!-- ✅ Kamera wajib -->
     <uses-feature android:name="android.hardware.camera.any" android:required="true" />
 
     <application
-        android:label="user"
+        android:label="SembuhTBC"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true"> <!-- opsional jika kamu pakai http -->
 
-        <!-- ✅ Nonaktifkan Impeller untuk menghindari crash kamera -->
+        <!-- ❗️Nonaktifkan Impeller untuk Flutter -->
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="false" />
 
+        <!-- ✅ Notification Channel Default (Firebase / Local Notification) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="reminder_channel" />
+
+        <!-- ✅ Konfigurasi Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode">
 
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
-
-            <!-- Firebase notification channel -->
-            <meta-data
-                android:name="com.google.firebase.messaging.default_notification_channel_id"
-                android:value="reminder_channel" />
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -47,13 +49,13 @@
             </intent-filter>
         </activity>
 
-        <!-- Flutter Plugin Meta -->
+        <!-- ✅ Flutter Plugin Embedding -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
 
-    <!-- Untuk mendukung intent proses teks -->
+    <!-- ✅ Intent Support untuk teks (tidak wajib) -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT" />

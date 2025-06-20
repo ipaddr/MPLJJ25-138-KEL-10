@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:user/services/auth_service.dart';
@@ -104,20 +105,14 @@ class _HomePageState extends State<HomePage> {
 Future<void> scheduleReminderNotification({
   required String medicineName,
   required String doseTime,
-  required DateTime scheduledDateTime, // Ini adalah waktu dosis yang sebenarnya
+  required DateTime scheduledDateTime,
 }) async {
-  // Hitung waktu notifikasi = 5 menit sebelum waktu minum obat yang dijadwalkan
   final reminderTime = scheduledDateTime.subtract(const Duration(minutes: 5));
-
-  // Dapatkan waktu sekarang di zona waktu lokal
   final now = tz.TZDateTime.now(tz.local);
 
-  // Variabel untuk waktu notifikasi yang akan digunakan
   tz.TZDateTime finalScheduledNotificationTime;
 
-  // Logika untuk menjadwalkan notifikasi jika waktu pengingat sudah lewat
   if (reminderTime.isBefore(now)) {
-    // Jika waktu pengingat sudah lewat hari ini, jadwalkan untuk hari berikutnya pada waktu yang sama
     finalScheduledNotificationTime = tz.TZDateTime(
       tz.local,
       now.year,
@@ -125,26 +120,21 @@ Future<void> scheduleReminderNotification({
       now.day,
       reminderTime.hour,
       reminderTime.minute,
-      reminderTime.second,
-    ).add(const Duration(days: 1)); // Tambah 1 hari
+    ).add(const Duration(days: 1));
     print('DEBUG: Waktu pengingat untuk $medicineName pada $doseTime sudah lewat. Dijadwalkan untuk besok pada ${DateFormat.Hm().format(finalScheduledNotificationTime)}.');
   } else {
-    // Jika waktu pengingat masih di masa depan hari ini, gunakan waktu tersebut
     finalScheduledNotificationTime = tz.TZDateTime.from(reminderTime, tz.local);
     print('DEBUG: Menjadwalkan notifikasi untuk $medicineName pada ${DateFormat.Hm().format(finalScheduledNotificationTime)}.');
   }
 
-  // Ambil pesan notifikasi dari GeminiService
   final message = await GeminiService.getReminderMessage(medicineName, doseTime);
 
-  // Jadwalkan notifikasi lokal
   await flutterLocalNotificationsPlugin.zonedSchedule(
-    // ID unik untuk notifikasi ini
     '${scheduledDateTime.toIso8601String()}_${medicineName}_$doseTime'.hashCode,
-    'Pengingat Minum Obat', // Judul notifikasi
-    message, // Pesan notifikasi dari Gemini
-    finalScheduledNotificationTime, // Waktu notifikasi yang telah disesuaikan
-    const NotificationDetails( // <-- Argumen ke-5: NotificationDetails
+    'Pengingat Minum Obat',
+    message,
+    finalScheduledNotificationTime,
+    const NotificationDetails(
       android: AndroidNotificationDetails(
         'reminder_channel',
         'Pengingat Obat',
@@ -153,20 +143,15 @@ Future<void> scheduleReminderNotification({
         priority: Priority.high,
         playSound: true,
       ),
-      // Untuk iOS, jika Anda perlu pengaturan serupa, gunakan:
-      // iOS: DarwinNotificationDetails(
-      //   presentAlert: true,
-      //   presentBadge: true,
-      //   presentSound: true,
-      //   interruptionLevel: InterruptionLevel.active,
-      // ),
-    ), // <-- PENUTUP NotificationDetails
-    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, // <-- INI ADALAH NAMED ARGUMENT SETELAH NOTIFICATIONDETAILS
-    // matchDateTimeComponents: DateTimeComponents.time, // Jika ingin notifikasi berulang harian
-  ); // <-- PENUTUP zonedSchedule. Pastikan ini ada dan koma di atasnya benar.
+    ),
+    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+    // Tidak perlu pakai uiLocalNotificationDateInterpretation lagi
+  );
 
   print('SUCCESS: Notifikasi dijadwalkan untuk $medicineName pada ${DateFormat.Hm().format(finalScheduledNotificationTime)} (Aktual: ${DateFormat.Hm().format(scheduledDateTime)})');
 }
+
+
 
   @override
   Widget build(BuildContext context) {

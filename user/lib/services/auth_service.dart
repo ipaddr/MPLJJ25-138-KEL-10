@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:shared_preferences/shared_preferences.dart'; // <-- PENTING: Import ini
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -31,6 +32,12 @@ class AuthService {
   static Future<void> signOut() async {
     try {
       await _auth.signOut();
+      // --- LOGIKA PERSISTENT LOGIN: HAPUS STATUS LOGIN SAAT LOGOUT ---
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', false); // Set isLoggedIn ke false
+      await prefs.remove('userId'); // Hapus userId juga
+      print('DEBUG: Pengguna logout dan status login dihapus dari SharedPreferences.');
+      // --- AKHIR LOGIKA PERSISTENT LOGIN ---
     } catch (e) {
       print('Sign out error: $e');
       rethrow;
@@ -51,10 +58,10 @@ class AuthService {
       await _firestore.collection('users').doc(credential.user!.uid).set({
         'email': email,
         'username': username,
-        'gender': 'Perempuan', // <-- PERUBAHAN UTAMA: Nilai default yang valid
+        'gender': 'Perempuan',
         'birthDate': DateTime(2000, 1, 1).toIso8601String(),
         'isVerified': false,
-        'profilePictureUrl': '',
+        'profilePictureBase64': '', // Menggunakan Base64 sesuai diskusi
         'role': 'user',
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -112,15 +119,10 @@ class AuthService {
 
   static Future<void> sendPasswordResetEmail(String email) async {
     try {
-      // Firebase akan secara internal memeriksa apakah email ada
-      // dan mengirimkan link reset jika ada. Ini lebih aman.
       await _auth.sendPasswordResetEmail(email: email);
     } on FirebaseAuthException catch (e) {
-      // Lempar kembali exception dari Firebase agar bisa ditangani di UI
-      // dengan pesan yang lebih spesifik.
       throw e;
     } catch (e) {
-      // Menangani error tak terduga lainnya.
       throw Exception('Terjadi kesalahan tidak terduga: ${e.toString()}');
     }
   }
@@ -266,6 +268,7 @@ class AuthService {
           channelDescription: 'Pengingat untuk minum obat TB sesuai jadwal',
           importance: Importance.max,
           priority: Priority.high,
+          playSound: true,
           sound: const RawResourceAndroidNotificationSound('res_custom_sound'),
         );
     const DarwinNotificationDetails iOSPlatformChannelSpecifics =
@@ -293,9 +296,8 @@ class AuthService {
 
         time = time.add(Duration(hours: i * intervalHours));
 
-        // Menggunakan tz.TZDateTime.now(tz.local) untuk perbandingan zona waktu yang benar
         if (time.isBefore(tz.TZDateTime.now(tz.local))) {
-          time = time.add(const Duration(days: 1)); // Jadwalkan untuk hari berikutnya jika sudah lewat
+          time = time.add(const Duration(days: 1));
         }
         scheduledTimes.add(time);
       }
@@ -319,7 +321,6 @@ class AuthService {
           scheduledTime.second,
         );
 
-        // Perbandingan juga menggunakan tz.TZDateTime.now(tz.local)
         if (notificationDateTime.isAfter(tz.TZDateTime.now(tz.local))) {
           await localNotificationsPlugin.zonedSchedule(
             '$id-$day-$i'.hashCode,
@@ -328,9 +329,6 @@ class AuthService {
             notificationDateTime,
             platformChannelSpecifics,
             androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            // >>>>>>>>> BARIS INI DIHAPUS <<<<<<<<<
-            // uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-            // >>>>>>>>> BARIS INI DIHAPUS <<<<<<<<<
             payload: '$id|${doseTime}|$medicineName',
           );
           print(
@@ -388,10 +386,20 @@ class AuthService {
       if (!doc.exists) {
         await userRef.set({
           'username': username,
-          'gender': gender,
+          'email': _auth.currentUser!.email,
+          'gender': 'Perempuan',
           'birthDate': birthDate.toIso8601String(),
           'profilePictureBase64': profilePictureBase64,
           'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+          'isVerified': false,
+          'role': 'user',
+          'rewards': {
+            'minumObat2Hari2KaliClaimed': false,
+            'minumObatSemingguPenuhClaimed': false,
+            'minumObatTanpaPutusClaimed': false,
+            'minumObatSampaiHabisClaimed': false,
+          },
         });
       } else {
         await userRef.update({
@@ -418,6 +426,14 @@ class AuthService {
           'gender': 'Perempuan',
           'birthDate': DateTime(2000, 1, 1).toIso8601String(),
           'profilePictureBase64': '',
+          'isVerified': false,
+          'role': 'user',
+          'rewards': {
+            'minumObat2Hari2KaliClaimed': false,
+            'minumObatSemingguPenuhClaimed': false,
+            'minumObatTanpaPutusClaimed': false,
+            'minumObatSampaiHabisClaimed': false,
+          },
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
@@ -531,7 +547,7 @@ class AuthService {
             .get();
 
     // ignore: unused_local_variable
-    bool hasAnyDosesScheduledForDate = false;
+    bool hasAnyDosesScheduledForDay = false; // Changed from hasAnyDosesScheduledForDate
 
     for (var scheduleDoc in schedulesSnapshot.docs) {
       final Map<String, dynamic> scheduleData = scheduleDoc.data();
@@ -555,7 +571,7 @@ class AuthService {
 
       if (scheduledTimes.isEmpty) continue;
 
-      hasAnyDosesScheduledForDate = true;
+      hasAnyDosesScheduledForDay = true; // Changed from hasAnyDosesScheduledForDate
 
       final takenDosesDoc =
           await _firestore
@@ -578,7 +594,7 @@ class AuthService {
         }
       }
     }
-    return true;
+    return true; // Return true jika semua dosis yang dijadwalkan sudah diminum (atau tidak ada jadwal)
   }
 
   static Future<int> getConsecutiveDaysCompleted(String userId) async {
@@ -591,7 +607,8 @@ class AuthService {
       currentDate.day,
     );
 
-    for (int i = 0; i < 365; i++) {
+    // Iterasi mundur dari hari ini
+    for (int i = 0; i < 365; i++) { // Maksimal 1 tahun mundur
       final dateToCheck = currentDate.subtract(Duration(days: i));
       final bool allTakenOnThisDay = await areAllDosesTakenForDay(
         userId,
@@ -601,6 +618,7 @@ class AuthService {
       if (allTakenOnThisDay) {
         consecutiveDays++;
       } else {
+        // Hentikan jika ada satu hari yang tidak lengkap
         return consecutiveDays;
       }
     }
@@ -625,7 +643,8 @@ class AuthService {
             .get();
 
     if (schedulesSnapshot.docs.isEmpty) {
-      return false;
+      // Jika tidak ada jadwal aktif, secara teknis tidak ada yang harus diselesaikan
+      return true; // Menganggap selesai jika tidak ada jadwal
     }
 
     final DateTime now = DateTime.now();
@@ -641,6 +660,7 @@ class AuthService {
       final DateTime scheduleStartDate = DateTime.parse(startDateStr);
       final DateTime scheduleEndDate = DateTime.parse(endDateStr);
 
+      // Jika jadwal berakhir di masa depan, berarti belum selesai
       if (scheduleEndDate.isAfter(todayAtMidnight)) {
         return false;
       }
@@ -648,9 +668,10 @@ class AuthService {
       int actualTakenDosesForThisSchedule = 0;
       int totalExpectedDosesForThisSchedule = 0;
 
+      // Iterasi dari tanggal mulai hingga tanggal berakhir (inklusif)
       for (
         DateTime d = scheduleStartDate;
-        d.isBefore(scheduleEndDate.add(const Duration(days: 1)));
+        !d.isAfter(scheduleEndDate); // Iterasi sampai dan termasuk endDate
         d = d.add(const Duration(days: 1))
       ) {
         final String dateKey = DateFormat('yyyy-MM-dd').format(d);

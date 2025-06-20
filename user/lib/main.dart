@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -8,6 +9,8 @@ import 'package:timezone/data/latest_all.dart' as tz; // Perhatikan as tz
 import 'package:timezone/timezone.dart' as tz; // Perhatikan as tz
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart'; // ← Tambahan
 // import 'package:flutter_native_timezone/flutter_native_timezone.dart'; // <-- Baris ini Dihapus/Dikomentari
 
 // Autentikasi dan halaman awal
@@ -38,7 +41,7 @@ import 'pages/result_photo_page.dart';
 import 'pages/reward_page.dart';
 import 'pages/reward_code_page.dart';
 
-// Global instance for notifications
+// Global instance untuk notifikasi
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
@@ -49,100 +52,98 @@ void onDidReceiveLocalNotification(
   String? body,
   String? payload,
 ) async {
-  debugPrint(
-    'onDidReceiveLocalNotification: id=$id, title=$title, body=$body, payload=$payload',
-  );
-  // Di sini Anda bisa menampilkan dialog atau menavigasi jika aplikasi di latar depan (iOS < 10)
+  debugPrint('LocalNotification: $title - $body');
 }
 
-// Fungsi untuk membuat notifikasi channel (PENTING untuk Android 8.0+)
+/// Membuat notification channel di Android (WAJIB untuk Android 8+)
 Future<void> _createNotificationChannel() async {
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'reminder_channel', // id: HARUS sama dengan id channel di AndroidNotificationDetails
-    'Pengingat Obat', // name: Nama yang terlihat oleh pengguna di pengaturan notifikasi
-    description: 'Channel untuk notifikasi pengingat minum obat Anda', // deskripsi
-    importance: Importance.max, // Pentingnya notifikasi (seperti Urgent)
+    'reminder_channel',
+    'Pengingat Obat',
+    description: 'Channel untuk notifikasi pengingat minum obat Anda',
+    importance: Importance.max,
     playSound: true,
   );
 
-  await flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(channel);
-  print('DEBUG: Notifikasi channel "reminder_channel" dibuat/diverifikasi.');
-}
+  final androidPlugin = flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
 
+  await androidPlugin?.createNotificationChannel(channel);
+
+  print('DEBUG: Channel "reminder_channel" berhasil dibuat/ada.');
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Inisialisasi data simbol lokal untuk intl (penting untuk format tanggal/waktu di berbagai bahasa)
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   await initializeDateFormatting('id_ID', null);
+  Intl.defaultLocale = 'id_ID';
 
-  // --- Inisialisasi Timezone ---
-  tz.initializeTimeZones(); // Menginisialisasi database zona waktu
-  // Karena flutter_native_timezone dihapus, kita set zona waktu secara manual.
-  // Ini mengasumsikan semua pengguna berada di zona waktu yang sama (mis. Jakarta).
-  tz.setLocalLocation(tz.getLocation('Asia/Jakarta')); // <-- ATUR SECARA MANUAL ZONA WAKTU DEFAULT
-  print('DEBUG: Zona waktu lokal diatur secara manual ke: Asia/Jakarta');
-  // --- Akhir Inisialisasi Timezone ---
+  tz.initializeTimeZones();
+  tz.setLocalLocation(tz.getLocation('Asia/Jakarta'));
+  print('DEBUG: Zona waktu lokal diatur ke Asia/Jakarta');
 
-  // --- Inisialisasi FlutterLocalNotificationsPlugin ---
-  const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher'); // Pastikan ini ikon yang benar
+  // ✅ Minta izin notifikasi (wajib Android 13+)
+  if (Platform.isAndroid) {
+    final status = await Permission.notification.status;
+    if (!status.isGranted) {
+      final result = await Permission.notification.request();
+      print('DEBUG: Izin notifikasi diberikan? ${result.isGranted}');
+    }
+  }
 
-  final DarwinInitializationSettings initializationSettingsIOS =
-      DarwinInitializationSettings(
+  // ✅ Inisialisasi notifikasi (Android & iOS)
+  const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+  final iosSettings = DarwinInitializationSettings(
     requestAlertPermission: true,
     requestBadgePermission: true,
     requestSoundPermission: true,
-    // onDidReceiveLocalNotification sudah dihapus di versi 16+
-    // onDidReceiveLocalNotification: onDidReceiveLocalNotification,
   );
 
-  final InitializationSettings initializationSettings = InitializationSettings(
-    android: initializationSettingsAndroid,
-    iOS: initializationSettingsIOS,
+  final initSettings = InitializationSettings(
+    android: androidSettings,
+    iOS: iosSettings,
   );
 
   await flutterLocalNotificationsPlugin.initialize(
-    initializationSettings,
-    onDidReceiveNotificationResponse: (NotificationResponse response) async {
-      debugPrint(
-        'onDidReceiveNotificationResponse: payload: ${response.payload}',
-      );
-      // Di sini Anda bisa menambahkan logika untuk menavigasi ke halaman tertentu
-      // berdasarkan `response.payload` jika notifikasi di-tap.
+    initSettings,
+    onDidReceiveNotificationResponse: (NotificationResponse response) {
+      debugPrint('Notifikasi ditekan! Payload: ${response.payload}');
     },
-    // Jika Anda ingin menangani tap notifikasi saat aplikasi terminated/background,
-    // Anda perlu `onDidReceiveBackgroundNotificationResponse` dan fungsi top-level lainnya.
-    // @pragma('vm:entry-point')
-    // static void notificationTapBackground(NotificationResponse notificationResponse) { ... }
-    //onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
   );
-  // --- Akhir Inisialisasi FlutterLocalNotificationsPlugin ---
 
-  // PENTING: Panggil fungsi untuk membuat/memverifikasi channel notifikasi
-  await _createNotificationChannel(); // <-- PANGGILAN INI DITAMBAHKAN
+  // ✅ Buat notification channel
+  await _createNotificationChannel();
 
-  runApp(const MyApp());
+  // ✅ Ambil status login
+  final prefs = await SharedPreferences.getInstance();
+  final bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
+
+  // ✅ Jalankan aplikasi
+  runApp(MyApp(isLoggedIn: isLoggedIn));
 }
 
 
+
+
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool isLoggedIn;
+  const MyApp({super.key, required this.isLoggedIn});
 
   @override
   Widget build(BuildContext context) {
-    // Setting defaultLocale di sini juga tidak masalah, tapi pastikan juga
-    // initializeDateFormatting('id_ID', null); sudah dipanggil sebelum runApp.
     Intl.defaultLocale = 'id_ID';
 
     return MaterialApp(
       title: 'SembuhTBC',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.blue, fontFamily: 'Poppins'),
-      initialRoute: '/',
+      initialRoute: isLoggedIn ? '/home' : '/',
       routes: {
         '/': (context) => const WelcomePage(),
         '/login': (context) => const LoginPage(),
@@ -156,73 +157,66 @@ class MyApp extends StatelessWidget {
         '/profile': (context) => const ProfileUserPage(),
 
         '/med-info': (context) {
-          final args =
-              ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
           return MedInfoPage(
-            scheduleId: args['scheduleId'] as String,
-            name: args['name'] as String,
-            dose: args['dose'] as String,
-            medicineType: args['medicineType'] as String,
-            doseTime: args['doseTime'] as String,
+            scheduleId: args['scheduleId'],
+            name: args['name'],
+            dose: args['dose'],
+            medicineType: args['medicineType'],
+            doseTime: args['doseTime'],
           );
         },
         '/verification-warning': (context) {
-          final args =
-              ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
           return VerificationWarningPage(
-            scheduleId: args['scheduleId'] as String,
-            doseTime: args['doseTime'] as String,
+            scheduleId: args['scheduleId'],
+            doseTime: args['doseTime'],
           );
         },
         '/waiting-verification': (context) => const WaitingVerificationPage(),
         '/verification-success': (context) {
-          final args =
-              ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
           return VerificationSuccessPage(
-            isSuccess: args?['isSuccess'] as bool? ?? true,
-            message:
-                args?['message'] as String? ??
-                "Akun Anda telah berhasil diverifikasi oleh admin.",
+            isSuccess: args?['isSuccess'] ?? true,
+            message: args?['message'] ?? "Akun Anda telah berhasil diverifikasi oleh admin.",
           );
         },
         '/verif-done': (context) {
           final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
           return VerificationDonePage(
-            scheduleId: args?['scheduleId'] as String? ?? '',
-            doseTime: args?['doseTime'] as String? ?? '',
+            scheduleId: args?['scheduleId'] ?? '',
+            doseTime: args?['doseTime'] ?? '',
           );
         },
         '/take-photo': (context) {
-          final args =
-              ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
           return TakePhotoPage(
-            scheduleId: args['scheduleId'] as String,
-            doseTime: args['doseTime'] as String,
+            scheduleId: args['scheduleId'],
+            doseTime: args['doseTime'],
           );
         },
         '/waiting-photo': (context) {
           final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
           return WaitingResultPage(
-            scheduleId: args['scheduleId'] as String,
-            doseTime: args['doseTime'] as String,
-            imagePath: args['imagePath'] as String,
+            scheduleId: args['scheduleId'],
+            doseTime: args['doseTime'],
+            imagePath: args['imagePath'],
           );
         },
         '/result-photo': (context) {
           final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
           return ResultPhotoPage(
-              scheduleId: args['scheduleId'],
-              doseTime: args['doseTime'],
-              isPhotoVerified: args['isPhotoVerified'],
-              imagePath: args['imagePath'],
+            scheduleId: args['scheduleId'],
+            doseTime: args['doseTime'],
+            isPhotoVerified: args['isPhotoVerified'],
+            imagePath: args['imagePath'],
           );
         },
 
         '/reward': (context) => const RewardPage(),
         '/reward-code': (context) {
-          final args =
-              ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-          return RewardCodePage(rewardKey: args['rewardKey'] as String);
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          return RewardCodePage(rewardKey: args['rewardKey']);
         },
       },
     );
