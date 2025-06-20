@@ -13,9 +13,9 @@ android {
     compileSdk = 35 // Atau sesuai kebutuhan
     ndkVersion = "27.0.12077973"
 
-    defaultConfig {
+     defaultConfig {
         applicationId = "com.example.user"
-        minSdk = 21 // Firebase butuh minSdk 21
+        minSdk = 23 // <-- UBAH KE VERSI INI!
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"

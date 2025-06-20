@@ -1,43 +1,39 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.user">
 
-    <!-- ✅ Izin untuk fitur aplikasi -->
+    <!-- Izin yang dibutuhkan -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- ✅ Kamera wajib -->
+    <!-- Menyatakan aplikasi menggunakan kamera -->
     <uses-feature android:name="android.hardware.camera.any" android:required="true" />
 
     <application
-        android:label="SembuhTBC"
         android:name="${applicationName}"
+        android:label="SembuhTBC"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true"> <!-- opsional jika kamu pakai http -->
+        android:usesCleartextTraffic="true">
 
-        <!-- ❗️Nonaktifkan Impeller untuk Flutter -->
+        <!-- Menonaktifkan Impeller jika crash kamera -->
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="false" />
 
-        <!-- ✅ Notification Channel Default (Firebase / Local Notification) -->
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="reminder_channel" />
-
-        <!-- ✅ Konfigurasi Activity -->
+        <!-- Tema launch -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode">
+            android:windowSoftInputMode="adjustResize">
 
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
@@ -49,13 +45,37 @@
             </intent-filter>
         </activity>
 
-        <!-- ✅ Flutter Plugin Embedding -->
+        <!-- Untuk notifikasi dari Firebase (opsional) -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="reminder_channel" />
+
+        <!-- Untuk flutter embedding -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- ✅ Receiver untuk Awesome Notifications -->
+        <receiver
+            android:name="me.carda.awesome_notifications.notifications.receivers.NotificationReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="me.carda.awesome_notifications.notifications.receivers.ActionReceiver"
+            android:exported="true" />
+        <receiver
+            android:name="me.carda.awesome_notifications.notifications.receivers.DismissedReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="me.carda.awesome_notifications.notifications.receivers.RebootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
     </application>
 
-    <!-- ✅ Intent Support untuk teks (tidak wajib) -->
+    <!-- Untuk mendukung intent teks -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT" />

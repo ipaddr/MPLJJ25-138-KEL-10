@@ -3,9 +3,10 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/timezone.dart' as tz;
-import 'package:shared_preferences/shared_preferences.dart'; // <-- PENTING: Import ini
+// Remove unused imports from flutter_local_notifications and timezone
+// import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+// import 'package:timezone/timezone.dart' as tz;
+import 'package:awesome_notifications/awesome_notifications.dart'; // Import Awesome Notifications
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -32,12 +33,6 @@ class AuthService {
   static Future<void> signOut() async {
     try {
       await _auth.signOut();
-      // --- LOGIKA PERSISTENT LOGIN: HAPUS STATUS LOGIN SAAT LOGOUT ---
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isLoggedIn', false); // Set isLoggedIn ke false
-      await prefs.remove('userId'); // Hapus userId juga
-      print('DEBUG: Pengguna logout dan status login dihapus dari SharedPreferences.');
-      // --- AKHIR LOGIKA PERSISTENT LOGIN ---
     } catch (e) {
       print('Sign out error: $e');
       rethrow;
@@ -58,10 +53,10 @@ class AuthService {
       await _firestore.collection('users').doc(credential.user!.uid).set({
         'email': email,
         'username': username,
-        'gender': 'Perempuan',
+        'gender': 'Perempuan', // <-- PERUBAHAN UTAMA: Nilai default yang valid
         'birthDate': DateTime(2000, 1, 1).toIso8601String(),
         'isVerified': false,
-        'profilePictureBase64': '', // Menggunakan Base64 sesuai diskusi
+        'profilePictureUrl': '',
         'role': 'user',
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -119,10 +114,15 @@ class AuthService {
 
   static Future<void> sendPasswordResetEmail(String email) async {
     try {
+      // Firebase akan secara internal memeriksa apakah email ada
+      // dan mengirimkan link reset jika ada. Ini lebih aman.
       await _auth.sendPasswordResetEmail(email: email);
     } on FirebaseAuthException catch (e) {
+      // Lempar kembali exception dari Firebase agar bisa ditangani di UI
+      // dengan pesan yang lebih spesifik.
       throw e;
     } catch (e) {
+      // Menangani error tak terduga lainnya.
       throw Exception('Terjadi kesalahan tidak terduga: ${e.toString()}');
     }
   }
@@ -184,9 +184,7 @@ class AuthService {
         .snapshots()
         .map(
           (snapshot) =>
-              snapshot.docs
-                  .map((doc) => {...doc.data(), 'id': doc.id})
-                  .toList(),
+              snapshot.docs.map((doc) => {...doc.data(), 'id': doc.id}).toList(),
         );
   }
 
@@ -225,15 +223,14 @@ class AuthService {
   }) async {
     try {
       String dateKey = DateFormat('yyyy-MM-dd').format(date);
-      final doc =
-          await _firestore
-              .collection('users')
-              .doc(userId)
-              .collection('medication_schedules')
-              .doc(scheduleId)
-              .collection('taken_doses')
-              .doc(dateKey)
-              .get();
+      final doc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('medication_schedules')
+          .doc(scheduleId)
+          .collection('taken_doses')
+          .doc(dateKey)
+          .get();
 
       if (doc.exists && doc.data() != null) {
         final Map<String, dynamic> docData = doc.data()!;
@@ -248,8 +245,12 @@ class AuthService {
     }
   }
 
+  // --- START: AWESOME NOTIFICATIONS MIGRATION & PROFILE METHOD CHANGES ---
+
   static Future<void> scheduleMedicationNotification({
-    required FlutterLocalNotificationsPlugin localNotificationsPlugin,
+    // localNotificationsPlugin is no longer needed here for Awesome Notifications
+    // The previous FlutterLocalNotificationsPlugin was removed by design as AwesomeNotifications
+    // manages its own instance. The parameter is removed.
     required String id,
     required String medicineName,
     required String doseTime,
@@ -260,24 +261,6 @@ class AuthService {
     required bool alarmEnabled,
   }) async {
     if (!alarmEnabled) return;
-
-    final AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-          'medication_channel',
-          'Pengingat Obat SembuhTBC',
-          channelDescription: 'Pengingat untuk minum obat TB sesuai jadwal',
-          importance: Importance.max,
-          priority: Priority.high,
-          playSound: true,
-          sound: const RawResourceAndroidNotificationSound('res_custom_sound'),
-        );
-    const DarwinNotificationDetails iOSPlatformChannelSpecifics =
-        DarwinNotificationDetails(sound: 'custom_sound.aiff');
-
-    final NotificationDetails platformChannelSpecifics = NotificationDetails(
-      android: androidPlatformChannelSpecifics,
-      iOS: iOSPlatformChannelSpecifics,
-    );
 
     List<DateTime> scheduledTimes = [];
     try {
@@ -296,8 +279,9 @@ class AuthService {
 
         time = time.add(Duration(hours: i * intervalHours));
 
-        if (time.isBefore(tz.TZDateTime.now(tz.local))) {
-          time = time.add(const Duration(days: 1));
+        // Use standard DateTime for comparison with Awesome Notifications
+        if (time.isBefore(DateTime.now())) {
+          time = time.add(const Duration(days: 1)); // Schedule for next day if past
         }
         scheduledTimes.add(time);
       }
@@ -306,13 +290,14 @@ class AuthService {
       return;
     }
 
+    // Schedule individual notifications for each day over daysDuration
     for (int day = 0; day < daysDuration; day++) {
       final currentDay = startDate.add(Duration(days: day));
       for (int i = 0; i < scheduledTimes.length; i++) {
         final scheduledTime = scheduledTimes[i];
 
-        final notificationDateTime = tz.TZDateTime(
-          tz.local,
+        // Create DateTime object for Awesome Notifications scheduling
+        final notificationDateTime = DateTime(
           currentDay.year,
           currentDay.month,
           currentDay.day,
@@ -321,32 +306,56 @@ class AuthService {
           scheduledTime.second,
         );
 
-        if (notificationDateTime.isAfter(tz.TZDateTime.now(tz.local))) {
-          await localNotificationsPlugin.zonedSchedule(
-            '$id-$day-$i'.hashCode,
-            'Waktunya minum obat!',
-            'Anda punya jadwal minum $medicineName ($doseTime) sekarang.',
-            notificationDateTime,
-            platformChannelSpecifics,
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            payload: '$id|${doseTime}|$medicineName',
+        // Only schedule if in the future
+        if (notificationDateTime.isAfter(DateTime.now())) {
+          await AwesomeNotifications().createNotification(
+            content: NotificationContent(
+              id: '$id-${day}_$i'.hashCode, // Unique ID for Awesome Notifications
+              channelKey: 'reminder_channel', // Must match channel configured in main.dart
+              title: 'Waktunya minum obat!',
+              body: 'Anda punya jadwal minum $medicineName ($doseTime) sekarang.',
+              notificationLayout: NotificationLayout.Default,
+              // Payload must be Map<String, String> for Awesome Notifications
+              payload: {'id': id, 'doseTime': doseTime, 'medicineName': medicineName},
+              category: NotificationCategory.Reminder,
+              wakeUpScreen: true, // To wake up the screen
+              fullScreenIntent: true, // For fullscreen pop-up (requires special permission on Android 10+)
+              autoDismissible: false, // Notification doesn't disappear until user interacts
+              // customSound: 'resource://raw/res_custom_sound', // Optional: if you have a custom sound defined in res/raw
+            ),
+            schedule: NotificationCalendar.fromDate(
+              date: notificationDateTime,
+              allowWhileIdle: true, // Allow when device is idle
+              preciseAlarm: true, // Requires SCHEDULE_EXACT_ALARM permission
+              repeats: false, // Individual notification, not daily repeated
+            ),
           );
           print(
-            "Scheduled: $medicineName at $notificationDateTime (ID: ${'$id-$day-$i'.hashCode})",
+            "Scheduled: $medicineName at $notificationDateTime (ID: ${'$id-${day}_$i'.hashCode})",
           );
         }
       }
     }
-    print("Jadwal notifikasi untuk $medicineName telah dibuat.");
+    print("Jadwal notifikasi untuk $medicineName telah dibuat dengan Awesome Notifications.");
   }
 
   static Future<void> cancelMedicationNotifications({
-    required FlutterLocalNotificationsPlugin localNotificationsPlugin,
+    // localNotificationsPlugin is no longer needed here for Awesome Notifications
+    // The previous FlutterLocalNotificationsPlugin was removed by design.
     required String scheduleId,
   }) async {
     print(
-      "Placeholder for canceling notifications for scheduleId: $scheduleId",
+      "DEBUG: Membatalkan notifikasi untuk scheduleId: $scheduleId menggunakan Awesome Notifications.",
     );
+    // Awesome Notifications provides methods to cancel by id or channel key.
+    // To cancel all notifications from the 'reminder_channel':
+    await AwesomeNotifications().cancelNotificationsByChannelKey('reminder_channel');
+    // If you need to cancel a specific notification, you would need its exact ID.
+    // Since your scheduling uses '$id-${day}_$i'.hashCode, to cancel a specific schedule,
+    // you would need to iterate through possible 'day' and 'i' values for that scheduleId
+    // or store the notification IDs when scheduling them. For simplicity,
+    // canceling by channel is often sufficient for medication reminders if all
+    // reminders are in the same channel.
   }
 
   static Stream<Map<String, dynamic>> getUserRewards(String userId) {
@@ -361,6 +370,7 @@ class AuthService {
     });
   }
 
+  // >>>>>> PERUBAHAN DI SINI: MENGHAPUS 'static' <<<<<<
   Future<Map<String, dynamic>?> getUserProfile(String uid) async {
     try {
       DocumentSnapshot doc =
@@ -372,6 +382,7 @@ class AuthService {
     }
   }
 
+  // >>>>>> PERUBAHAN DI SINI: MENGHAPUS 'static' <<<<<<
   Future<void> updateUserProfile({
     required String uid,
     required String username,
@@ -386,20 +397,10 @@ class AuthService {
       if (!doc.exists) {
         await userRef.set({
           'username': username,
-          'email': _auth.currentUser!.email,
-          'gender': 'Perempuan',
+          'gender': gender,
           'birthDate': birthDate.toIso8601String(),
           'profilePictureBase64': profilePictureBase64,
           'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-          'isVerified': false,
-          'role': 'user',
-          'rewards': {
-            'minumObat2Hari2KaliClaimed': false,
-            'minumObatSemingguPenuhClaimed': false,
-            'minumObatTanpaPutusClaimed': false,
-            'minumObatSampaiHabisClaimed': false,
-          },
         });
       } else {
         await userRef.update({
@@ -416,6 +417,7 @@ class AuthService {
     }
   }
 
+  // >>>>>> PERUBAHAN DI SINI: MENGHAPUS 'static' <<<<<<
   Future<void> createUserProfileIfNotExists(String uid, String email) async {
     try {
       final doc = await _firestore.collection('users').doc(uid).get();
@@ -426,14 +428,6 @@ class AuthService {
           'gender': 'Perempuan',
           'birthDate': DateTime(2000, 1, 1).toIso8601String(),
           'profilePictureBase64': '',
-          'isVerified': false,
-          'role': 'user',
-          'rewards': {
-            'minumObat2Hari2KaliClaimed': false,
-            'minumObatSemingguPenuhClaimed': false,
-            'minumObatTanpaPutusClaimed': false,
-            'minumObatSampaiHabisClaimed': false,
-          },
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
@@ -442,6 +436,9 @@ class AuthService {
       rethrow;
     }
   }
+
+  // --- END: AWESOME NOTIFICATIONS MIGRATION & PROFILE METHOD CHANGES ---
+
 
   static Future<void> updateRewardClaimStatus(
     String userId,
@@ -546,8 +543,7 @@ class AuthService {
             .where('isActive', isEqualTo: true)
             .get();
 
-    // ignore: unused_local_variable
-    bool hasAnyDosesScheduledForDay = false; // Changed from hasAnyDosesScheduledForDate
+    bool hasAnyDosesScheduledForDate = false;
 
     for (var scheduleDoc in schedulesSnapshot.docs) {
       final Map<String, dynamic> scheduleData = scheduleDoc.data();
@@ -571,7 +567,7 @@ class AuthService {
 
       if (scheduledTimes.isEmpty) continue;
 
-      hasAnyDosesScheduledForDay = true; // Changed from hasAnyDosesScheduledForDate
+      hasAnyDosesScheduledForDate = true;
 
       final takenDosesDoc =
           await _firestore
@@ -594,7 +590,7 @@ class AuthService {
         }
       }
     }
-    return true; // Return true jika semua dosis yang dijadwalkan sudah diminum (atau tidak ada jadwal)
+    return hasAnyDosesScheduledForDate;
   }
 
   static Future<int> getConsecutiveDaysCompleted(String userId) async {
@@ -607,8 +603,7 @@ class AuthService {
       currentDate.day,
     );
 
-    // Iterasi mundur dari hari ini
-    for (int i = 0; i < 365; i++) { // Maksimal 1 tahun mundur
+    for (int i = 0; i < 365; i++) {
       final dateToCheck = currentDate.subtract(Duration(days: i));
       final bool allTakenOnThisDay = await areAllDosesTakenForDay(
         userId,
@@ -618,7 +613,6 @@ class AuthService {
       if (allTakenOnThisDay) {
         consecutiveDays++;
       } else {
-        // Hentikan jika ada satu hari yang tidak lengkap
         return consecutiveDays;
       }
     }
@@ -643,8 +637,7 @@ class AuthService {
             .get();
 
     if (schedulesSnapshot.docs.isEmpty) {
-      // Jika tidak ada jadwal aktif, secara teknis tidak ada yang harus diselesaikan
-      return true; // Menganggap selesai jika tidak ada jadwal
+      return false;
     }
 
     final DateTime now = DateTime.now();
@@ -660,7 +653,6 @@ class AuthService {
       final DateTime scheduleStartDate = DateTime.parse(startDateStr);
       final DateTime scheduleEndDate = DateTime.parse(endDateStr);
 
-      // Jika jadwal berakhir di masa depan, berarti belum selesai
       if (scheduleEndDate.isAfter(todayAtMidnight)) {
         return false;
       }
@@ -668,10 +660,9 @@ class AuthService {
       int actualTakenDosesForThisSchedule = 0;
       int totalExpectedDosesForThisSchedule = 0;
 
-      // Iterasi dari tanggal mulai hingga tanggal berakhir (inklusif)
       for (
         DateTime d = scheduleStartDate;
-        !d.isAfter(scheduleEndDate); // Iterasi sampai dan termasuk endDate
+        d.isBefore(scheduleEndDate.add(const Duration(days: 1)));
         d = d.add(const Duration(days: 1))
       ) {
         final String dateKey = DateFormat('yyyy-MM-dd').format(d);

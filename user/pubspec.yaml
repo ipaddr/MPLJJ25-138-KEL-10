@@ -1,11 +1,14 @@
 name: user
 description: "A new Flutter project."
-publish_to: "none"
+publish_to: "none" # Ini harus ada
 
-version: 1.0.0+1
+version: 1.0.0+1 # Ini juga harus ada
 
+# --- BAGIAN YANG HILANG/PERLU DITAMBAHKAN ---
 environment:
-  sdk: ^3.7.0
+  sdk: '^3.8.0' # ATAU gunakan versi SDK Flutter Anda saat ini, misal: '>=3.0.0 <4.0.0'
+                # Saya merekomendasikan '^3.8.0' karena itu yang disarankan Flutter CLI.
+# --- AKHIR BAGIAN YANG HILANG/PERLU DITAMBAHKAN ---
 
 dependencies:
   flutter:
@@ -22,9 +25,9 @@ dependencies:
   camera: ^0.10.5+9
 
   # Notifikasi & Waktu
-  flutter_local_notifications: ^19.2.1
+  awesome_notifications: ^0.10.1
   timezone: ^0.10.1
-  intl: ^0.19.0
+  intl: ^0.20.2
 
   # Utility
   shared_preferences: ^2.2.3
@@ -39,7 +42,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0 # kamu bisa pakai 3.0.0 karena lebih baru dan cocok dengan Dart 3.7
+  flutter_lints: ^3.0.0
 
 flutter:
   uses-material-design: true
