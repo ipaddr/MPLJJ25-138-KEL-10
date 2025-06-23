@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:user/services/auth_service.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/timezone.dart' as tz;
-import 'package:user/services/gemini_service.dart'; // Import GeminiService
-import '../../main.dart'; // Supaya bisa akses flutterLocalNotificationsPlugin
+import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:permission_handler/permission_handler.dart'; // <-- TAMBAHKAN INI
 
 // Halaman lain yang diimpor
 import 'profile_user.dart';
@@ -31,59 +27,52 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _checkCurrentUserAndLoadData();
-    // Mengatur locale default untuk format tanggal dan waktu menjadi Bahasa Indonesia
     Intl.defaultLocale = 'id_ID';
-    // Meminta izin notifikasi saat aplikasi dimulai
-    _requestNotificationPermissions();
+    _checkCurrentUserAndLoadData();
+    _setupNotifications();
   }
 
-  // Meminta izin notifikasi untuk Android 13+ DAN izin SCHEDULE_EXACT_ALARM
-  void _requestNotificationPermissions() async {
-    // Permintaan izin notifikasi umum untuk Android 13 (API 33) ke atas
-    if (Theme.of(context).platform == TargetPlatform.android) {
-      final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-          flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
+  // --- LOGIKA NOTIFIKASI BARU ---
+  void _setupNotifications() async {
+    // 1. Minta semua izin yang diperlukan
+    bool permissionsGranted = await _requestAllPermissions();
 
-      if (androidImplementation != null) {
-        // Request POST_NOTIFICATIONS permission for Android 13+
-        final bool? granted = await androidImplementation.requestNotificationsPermission();
-        if (granted != null && granted) {
-          print("DEBUG: Izin notifikasi umum Android diberikan.");
-        } else {
-          print("WARN: Izin notifikasi umum Android ditolak.");
-        }
-      }
-    }
-
-    // Permintaan izin SCHEDULE_EXACT_ALARM (untuk Android 12+)
-    // Ini adalah izin runtime, jadi harus diminta dari pengguna
-    final status = await Permission.scheduleExactAlarm.status;
-    if (status.isDenied || status.isRestricted || status.isLimited) {
-      print("DEBUG: Meminta izin SCHEDULE_EXACT_ALARM...");
-      final result = await Permission.scheduleExactAlarm.request();
-      if (result.isGranted) {
-        print("DEBUG: Izin SCHEDULE_EXACT_ALARM diberikan.");
-      } else {
-        print("WARN: Izin SCHEDULE_EXACT_ALARM ditolak. Fitur pengingat tepat mungkin tidak berfungsi.");
-        // Anda bisa menampilkan dialog atau snackbar untuk memberitahu pengguna
-        // bahwa mereka harus mengaktifkannya secara manual dari pengaturan aplikasi.
-        // openAppSettings(); // Membuka pengaturan aplikasi
-      }
-    } else if (status.isGranted) {
-      print("DEBUG: Izin SCHEDULE_EXACT_ALARM sudah diberikan.");
+    // 2. Jika izin diberikan DAN pengguna sudah login, jadwalkan semua notifikasi
+    if (permissionsGranted && _currentUser != null) {
+      await AuthService.scheduleAllNotificationsForUser(_currentUser!.uid);
+    } else {
+      print("WARN: Izin tidak lengkap, penjadwalan notifikasi dibatalkan.");
     }
   }
+
+  Future<bool> _requestAllPermissions() async {
+    PermissionStatus notificationStatus =
+        await Permission.notification.request();
+    if (notificationStatus.isDenied) {
+      print("WARN: Izin notifikasi umum DITOLAK.");
+      return false;
+    }
+    print("DEBUG: Izin notifikasi umum DIBERIKAN.");
+
+    PermissionStatus alarmStatus =
+        await Permission.scheduleExactAlarm.request();
+    if (alarmStatus.isDenied) {
+      print("WARN: Izin alarm presisi DITOLAK.");
+      return false;
+    }
+    print("DEBUG: Izin alarm presisi DIBERIKAN.");
+
+    return true;
+  }
+  // --- AKHIR LOGIKA NOTIFIKASI BARU ---
 
   void _checkCurrentUserAndLoadData() {
     if (_currentUser == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        // Navigasi ke halaman login jika pengguna belum masuk
         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
       });
     } else {
-      _loadUserProfile(); // Muat profil pengguna jika sudah masuk
+      _loadUserProfile();
     }
   }
 
@@ -91,82 +80,10 @@ class _HomePageState extends State<HomePage> {
     final profile = await _authService.getUserProfile(_currentUser!.uid);
     if (mounted) {
       setState(() {
-        _userProfile = profile; // Perbarui state dengan data profil
+        _userProfile = profile;
       });
     }
   }
-
-  /// Menjadwalkan notifikasi pengingat minum obat.
-  /// Notifikasi akan dijadwalkan 5 menit sebelum waktu dosis yang sebenarnya.
-  /// Jika waktu pengingat sudah lewat, akan dijadwalkan untuk hari berikutnya.
-   // ... (kode di atas) ...
-
-Future<void> scheduleReminderNotification({
-  required String medicineName,
-  required String doseTime,
-  required DateTime scheduledDateTime, // Ini adalah waktu dosis yang sebenarnya
-}) async {
-  // Hitung waktu notifikasi = 5 menit sebelum waktu minum obat yang dijadwalkan
-  final reminderTime = scheduledDateTime.subtract(const Duration(minutes: 5));
-
-  // Dapatkan waktu sekarang di zona waktu lokal
-  final now = tz.TZDateTime.now(tz.local);
-
-  // Variabel untuk waktu notifikasi yang akan digunakan
-  tz.TZDateTime finalScheduledNotificationTime;
-
-  // Logika untuk menjadwalkan notifikasi jika waktu pengingat sudah lewat
-  if (reminderTime.isBefore(now)) {
-    // Jika waktu pengingat sudah lewat hari ini, jadwalkan untuk hari berikutnya pada waktu yang sama
-    finalScheduledNotificationTime = tz.TZDateTime(
-      tz.local,
-      now.year,
-      now.month,
-      now.day,
-      reminderTime.hour,
-      reminderTime.minute,
-      reminderTime.second,
-    ).add(const Duration(days: 1)); // Tambah 1 hari
-    print('DEBUG: Waktu pengingat untuk $medicineName pada $doseTime sudah lewat. Dijadwalkan untuk besok pada ${DateFormat.Hm().format(finalScheduledNotificationTime)}.');
-  } else {
-    // Jika waktu pengingat masih di masa depan hari ini, gunakan waktu tersebut
-    finalScheduledNotificationTime = tz.TZDateTime.from(reminderTime, tz.local);
-    print('DEBUG: Menjadwalkan notifikasi untuk $medicineName pada ${DateFormat.Hm().format(finalScheduledNotificationTime)}.');
-  }
-
-  // Ambil pesan notifikasi dari GeminiService
-  final message = await GeminiService.getReminderMessage(medicineName, doseTime);
-
-  // Jadwalkan notifikasi lokal
-  await flutterLocalNotificationsPlugin.zonedSchedule(
-    // ID unik untuk notifikasi ini
-    '${scheduledDateTime.toIso8601String()}_${medicineName}_$doseTime'.hashCode,
-    'Pengingat Minum Obat', // Judul notifikasi
-    message, // Pesan notifikasi dari Gemini
-    finalScheduledNotificationTime, // Waktu notifikasi yang telah disesuaikan
-    const NotificationDetails( // <-- Argumen ke-5: NotificationDetails
-      android: AndroidNotificationDetails(
-        'reminder_channel',
-        'Pengingat Obat',
-        channelDescription: 'Channel untuk notifikasi pengingat minum obat',
-        importance: Importance.max,
-        priority: Priority.high,
-        playSound: true,
-      ),
-      // Untuk iOS, jika Anda perlu pengaturan serupa, gunakan:
-      // iOS: DarwinNotificationDetails(
-      //   presentAlert: true,
-      //   presentBadge: true,
-      //   presentSound: true,
-      //   interruptionLevel: InterruptionLevel.active,
-      // ),
-    ), // <-- PENUTUP NotificationDetails
-    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, // <-- INI ADALAH NAMED ARGUMENT SETELAH NOTIFICATIONDETAILS
-    // matchDateTimeComponents: DateTimeComponents.time, // Jika ingin notifikasi berulang harian
-  ); // <-- PENUTUP zonedSchedule. Pastikan ini ada dan koma di atasnya benar.
-
-  print('SUCCESS: Notifikasi dijadwalkan untuk $medicineName pada ${DateFormat.Hm().format(finalScheduledNotificationTime)} (Aktual: ${DateFormat.Hm().format(scheduledDateTime)})');
-}
 
   @override
   Widget build(BuildContext context) {
@@ -193,59 +110,8 @@ Future<void> scheduleReminderNotification({
             return _buildEmptyState();
           }
 
-          // Filter jadwal untuk hari yang dipilih
-          final allSchedules = snapshot.data!;
-          final activeSchedulesToday = allSchedules.where((schedule) {
-            final startDate = schedule['startDate'] as String?;
-            final endDate = schedule['endDate'] as String?;
-            if (startDate == null || endDate == null) return false;
-            final todayStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
-            return todayStr.compareTo(startDate) >= 0 &&
-                todayStr.compareTo(endDate) <= 0;
-          }).toList();
-
-          // --- Penjadwalan Notifikasi ---
-          // Penting: Batalkan semua notifikasi yang telah dijadwalkan sebelumnya untuk menghindari duplikasi.
-          // Ini sangat krusial karena StreamBuilder bisa rebuild beberapa kali.
-          // Namun, berhati-hatilah dengan `cancelAll()`. Jika Anda memiliki notifikasi lain
-          // yang tidak terkait dengan jadwal obat, mereka juga akan dibatalkan.
-          // Pertimbangkan untuk membatalkan notifikasi hanya dengan ID tertentu jika memungkinkan.
-          flutterLocalNotificationsPlugin.cancelAll(); 
-          
-          for (final schedule in activeSchedulesToday) {
-            final medicineName = schedule['medicineName'];
-            // Pastikan scheduledTimes adalah List<String>
-            final doseTimes = List<String>.from(schedule['scheduledTimes'] ?? []);
-
-            for (final doseTime in doseTimes) {
-              // Pisahkan string waktu (misal "08:30" menjadi "08" dan "30")
-              final parts = doseTime.split(':');
-              final int hour = int.parse(parts[0]);
-              final int minute = int.parse(parts[1]);
-              
-              // Buat objek TZDateTime lengkap untuk dosis berdasarkan tanggal yang dipilih dan waktu dosis
-              // Ini penting agar notifikasi dijadwalkan di zona waktu yang benar
-              final scheduledDateTime = tz.TZDateTime(
-                tz.local,
-                _selectedDate.year,
-                _selectedDate.month,
-                _selectedDate.day,
-                hour,
-                minute,
-              );
-
-              // Langsung panggil scheduleReminderNotification.
-              // Logika pengecekan apakah waktu sudah lewat ada di dalam fungsi tersebut.
-              scheduleReminderNotification(
-                medicineName: medicineName,
-                doseTime: doseTime,
-                scheduledDateTime: scheduledDateTime,
-              );
-            }
-          }
-          // --- Akhir Penjadwalan Notifikasi ---
-
-          return _buildMainContent(allSchedules);
+          // UI dibangun di sini, logika notifikasi sudah pindah
+          return _buildMainContent(snapshot.data!);
         },
       ),
     );
@@ -341,7 +207,6 @@ Future<void> scheduleReminderNotification({
   }
 
   Widget _buildMainContent(List<Map<String, dynamic>> schedules) {
-    // Filter jadwal yang aktif untuk tanggal yang dipilih
     final activeSchedulesToday =
         schedules.where((schedule) {
           final startDate = schedule['startDate'] as String?;
@@ -352,7 +217,6 @@ Future<void> scheduleReminderNotification({
               todayStr.compareTo(endDate) <= 0;
         }).toList();
 
-    // Buat daftar dosis yang akan ditampilkan untuk hari ini
     List<Map<String, dynamic>> scheduledDosesToday = [];
     for (var schedule in activeSchedulesToday) {
       List<String> times = List<String>.from(schedule['scheduledTimes'] ?? []);
@@ -366,7 +230,6 @@ Future<void> scheduleReminderNotification({
         });
       }
     }
-    // Urutkan dosis berdasarkan waktu agar tampilannya rapi
     scheduledDosesToday.sort(
       (a, b) => a['displayTime'].compareTo(b['displayTime']),
     );
@@ -389,7 +252,7 @@ Future<void> scheduleReminderNotification({
       height: 90,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: 7, // Menampilkan 7 hari dari hari ini
+        itemCount: 7,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemBuilder: (context, index) {
           final date = DateTime.now().add(Duration(days: index));
@@ -410,7 +273,7 @@ Future<void> scheduleReminderNotification({
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    DateFormat('EEE').format(date), // Nama hari (misal: "Sen")
+                    DateFormat('EEE').format(date),
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -419,7 +282,7 @@ Future<void> scheduleReminderNotification({
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    date.day.toString(), // Tanggal (misal: "15")
+                    date.day.toString(),
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -469,7 +332,7 @@ Future<void> scheduleReminderNotification({
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Text(
-                "Jadwal Hari Ini (${DateFormat('d MMMM').format(_selectedDate)})",
+                "Jadwal Hari Ini (${DateFormat('d MMMM y').format(_selectedDate)})",
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -535,13 +398,12 @@ Future<void> scheduleReminderNotification({
     return ListView.builder(
       itemCount: doses.length,
       shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(), // Non-scrollable list
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemBuilder: (context, index) {
         final doseItem = doses[index];
         final scheduleId = doseItem['scheduleId'];
         final doseTime = doseItem['displayTime'];
-        // Cek apakah dosis sudah diminum berdasarkan status yang diambil dari Firebase
         final bool isTaken = allStatuses[scheduleId]?[doseTime] ?? false;
         return _buildDoseCard(doseItem, isTaken);
       },
@@ -569,28 +431,25 @@ Future<void> scheduleReminderNotification({
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          // Jika sudah diminum, onTap dinonaktifkan
           onTap:
               isTaken
                   ? null
                   : () async {
-                      // Navigasi ke halaman detail obat
-                      final result = await Navigator.pushNamed(
-                        context,
-                        '/med-info',
-                        arguments: {
-                          'scheduleId': doseItem['scheduleId'],
-                          'name': doseItem['medicineName'],
-                          'dose': doseItem['dose'],
-                          'medicineType': doseItem['medicineType'],
-                          'doseTime': doseItem['displayTime'],
-                        },
-                      );
-                      // Jika ada perubahan (misal, obat ditandai sudah diminum), perbarui UI
-                      if (result == true && mounted) {
-                        setState(() {});
-                      }
-                    },
+                    final result = await Navigator.pushNamed(
+                      context,
+                      '/med-info',
+                      arguments: {
+                        'scheduleId': doseItem['scheduleId'],
+                        'name': doseItem['medicineName'],
+                        'dose': doseItem['dose'],
+                        'medicineType': doseItem['medicineType'],
+                        'doseTime': doseItem['displayTime'],
+                      },
+                    );
+                    if (result == true && mounted) {
+                      setState(() {});
+                    }
+                  },
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
@@ -707,13 +566,11 @@ Future<void> scheduleReminderNotification({
     );
   }
 
-  /// Mengambil progres minum obat untuk dosis yang dijadwalkan pada tanggal tertentu.
   Future<Map<String, dynamic>> _getMedicationProgress(
     List<Map<String, dynamic>> scheduledDoses,
   ) async {
     int takenCount = 0;
     final Map<String, Map<String, bool>> statusesBySchedule = {};
-
     if (_currentUser == null) {
       return {
         'taken': 0,
@@ -721,11 +578,8 @@ Future<void> scheduleReminderNotification({
         'statuses': statusesBySchedule,
       };
     }
-
-    // Kumpulkan ID jadwal unik
     final scheduleIds =
         scheduledDoses.map((d) => d['scheduleId'] as String).toSet();
-    // Untuk setiap ID jadwal, ambil status minum obatnya
     for (String id in scheduleIds) {
       final status = await AuthService.getDoseTakenStatus(
         userId: _currentUser!.uid,
@@ -734,15 +588,12 @@ Future<void> scheduleReminderNotification({
       );
       statusesBySchedule[id] = status;
     }
-
-    // Hitung jumlah dosis yang sudah diminum
     for (var dose in scheduledDoses) {
       if (statusesBySchedule[dose['scheduleId']]?[dose['displayTime']] ==
           true) {
         takenCount++;
       }
     }
-
     return {
       'taken': takenCount,
       'total': scheduledDoses.length,

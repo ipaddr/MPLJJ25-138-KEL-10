@@ -1,7 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.user">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- ✅ Izin penggunaan kamera dan penyimpanan -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
@@ -9,15 +7,16 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
-    <!-- ✅ Menyatakan aplikasi butuh kamera -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-feature android:name="android.hardware.camera.any" android:required="true" />
 
     <application
-        android:label="user"
+        android:label="SembuhTBC"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- ✅ Nonaktifkan Impeller untuk menghindari crash kamera -->
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="false" />
@@ -33,27 +32,31 @@
             android:windowSoftInputMode="adjustResize">
 
             <meta-data
-                android:name="io.flutter.embedding.android.NormalTheme"
-                android:resource="@style/NormalTheme" />
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
 
-            <!-- Firebase notification channel -->
             <meta-data
-                android:name="com.google.firebase.messaging.default_notification_channel_id"
-                android:value="reminder_channel" />
+              android:name="com.google.firebase.messaging.default_notification_channel_id"
+              android:value="reminder_channel" />
 
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
 
-        <!-- Flutter Plugin Meta -->
+        <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            </intent-filter>
+        </receiver>
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
 
-    <!-- Untuk mendukung intent proses teks -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT" />

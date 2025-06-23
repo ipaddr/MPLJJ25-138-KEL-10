@@ -5,6 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
+// --- TAMBAHAN IMPORT ---
+import 'package:user/services/gemini_service.dart'; // Untuk memanggil Gemini API
+import 'package:user/main.dart'; // Untuk mengakses instance flutterLocalNotificationsPlugin
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -246,108 +249,113 @@ class AuthService {
     }
   }
 
-  static Future<void> scheduleMedicationNotification({
-    required FlutterLocalNotificationsPlugin localNotificationsPlugin,
-    required String id,
-    required String medicineName,
-    required String doseTime,
-    required int timesPerDay,
-    required int intervalHours,
-    required int daysDuration,
-    required DateTime startDate,
-    required bool alarmEnabled,
-  }) async {
-    if (!alarmEnabled) return;
-
-    final AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-          'medication_channel',
-          'Pengingat Obat SembuhTBC',
-          channelDescription: 'Pengingat untuk minum obat TB sesuai jadwal',
-          importance: Importance.max,
-          priority: Priority.high,
-          sound: const RawResourceAndroidNotificationSound('res_custom_sound'),
-        );
-    const DarwinNotificationDetails iOSPlatformChannelSpecifics =
-        DarwinNotificationDetails(sound: 'custom_sound.aiff');
-
-    final NotificationDetails platformChannelSpecifics = NotificationDetails(
-      android: androidPlatformChannelSpecifics,
-      iOS: iOSPlatformChannelSpecifics,
+  /// ===================================================================
+  /// FUNGSI PENJADWALAN NOTIFIKASI YANG SUDAH DIPERBAIKI
+  /// ===================================================================
+  static Future<void> scheduleAllNotificationsForUser(String userId) async {
+    print(
+      "DEBUG: Memulai proses penjadwalan ulang semua notifikasi untuk user $userId...",
     );
 
-    List<DateTime> scheduledTimes = [];
-    try {
-      final timeParts = doseTime.split(':');
-      final int hour = int.parse(timeParts[0]);
-      final int minute = int.parse(timeParts[1]);
+    await flutterLocalNotificationsPlugin.cancelAll();
+    print("DEBUG: Semua notifikasi terjadwal sebelumnya telah dibatalkan.");
 
-      for (int i = 0; i < timesPerDay; i++) {
-        DateTime time = DateTime(
-          startDate.year,
-          startDate.month,
-          startDate.day,
-          hour,
-          minute,
-        );
+    final schedulesSnapshot =
+        await _firestore
+            .collection('users')
+            .doc(userId)
+            .collection('medication_schedules')
+            .where('isActive', isEqualTo: true)
+            .get();
 
-        time = time.add(Duration(hours: i * intervalHours));
-
-        // Menggunakan tz.TZDateTime.now(tz.local) untuk perbandingan zona waktu yang benar
-        if (time.isBefore(tz.TZDateTime.now(tz.local))) {
-          time = time.add(const Duration(days: 1)); // Jadwalkan untuk hari berikutnya jika sudah lewat
-        }
-        scheduledTimes.add(time);
-      }
-    } catch (e) {
-      print("Error calculating notification times: $e");
+    if (schedulesSnapshot.docs.isEmpty) {
+      print(
+        "INFO: Tidak ada jadwal obat aktif. Tidak ada notifikasi yang akan dijadwalkan.",
+      );
       return;
     }
 
-    for (int day = 0; day < daysDuration; day++) {
-      final currentDay = startDate.add(Duration(days: day));
-      for (int i = 0; i < scheduledTimes.length; i++) {
-        final scheduledTime = scheduledTimes[i];
+    int scheduledCount = 0;
+    for (var schedule in schedulesSnapshot.docs) {
+      final data = schedule.data();
 
-        final notificationDateTime = tz.TZDateTime(
-          tz.local,
-          currentDay.year,
-          currentDay.month,
-          currentDay.day,
-          scheduledTime.hour,
-          scheduledTime.minute,
-          scheduledTime.second,
+      if (data['alarmEnabled'] == false) {
+        print(
+          "INFO: Alarm untuk ${data['medicineName']} dinonaktifkan, notifikasi dilewati.",
         );
+        continue;
+      }
 
-        // Perbandingan juga menggunakan tz.TZDateTime.now(tz.local)
-        if (notificationDateTime.isAfter(tz.TZDateTime.now(tz.local))) {
-          await localNotificationsPlugin.zonedSchedule(
-            '$id-$day-$i'.hashCode,
-            'Waktunya minum obat!',
-            'Anda punya jadwal minum $medicineName ($doseTime) sekarang.',
-            notificationDateTime,
-            platformChannelSpecifics,
-            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-            // >>>>>>>>> BARIS INI DIHAPUS <<<<<<<<<
-            // uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-            // >>>>>>>>> BARIS INI DIHAPUS <<<<<<<<<
-            payload: '$id|${doseTime}|$medicineName',
+      final List<String> doseTimes = List<String>.from(
+        data['scheduledTimes'] ?? [],
+      );
+
+      for (var doseTime in doseTimes) {
+        try {
+          final now = tz.TZDateTime.now(tz.local);
+          final parts = doseTime.split(':');
+          final hour = int.parse(parts[0]);
+          final minute = int.parse(parts[1]);
+
+          var scheduledTimeForToday = tz.TZDateTime(
+            tz.local,
+            now.year,
+            now.month,
+            now.day,
+            hour,
+            minute,
           );
+
+          if (scheduledTimeForToday.isBefore(now)) {
+            scheduledTimeForToday = scheduledTimeForToday.add(
+              const Duration(days: 1),
+            );
+          }
+
+          final message = await GeminiService.getReminderMessage(
+            data['medicineName'],
+            doseTime,
+          );
+
+          const NotificationDetails
+          platformChannelSpecifics = NotificationDetails(
+            android: AndroidNotificationDetails(
+              'reminder_channel',
+              'Pengingat Obat',
+              channelDescription:
+                  'Channel untuk notifikasi pengingat minum obat dengan suara alarm.',
+              importance: Importance.max,
+              priority: Priority.high,
+              sound: RawResourceAndroidNotificationSound('alarm'),
+              playSound: true,
+            ),
+          );
+
+          await flutterLocalNotificationsPlugin.zonedSchedule(
+            '${schedule.id}_$doseTime'.hashCode,
+            'Waktunya Minum Obat!',
+            message,
+            scheduledTimeForToday,
+            platformChannelSpecifics,
+            // baris `uiLocalNotificationDateInterpretation` dihapus karena konflik
+            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            matchDateTimeComponents:
+                DateTimeComponents.time, // Perintah untuk mengulang setiap hari
+          );
+
+          scheduledCount++;
           print(
-            "Scheduled: $medicineName at $notificationDateTime (ID: ${'$id-$day-$i'.hashCode})",
+            "SUCCESS: Notifikasi harian untuk ${data['medicineName']} ($doseTime) dijadwalkan.",
+          );
+        } catch (e) {
+          print(
+            "ERROR: Gagal menjadwalkan notifikasi untuk ${data['medicineName']} ($doseTime). Error: $e",
           );
         }
       }
     }
-    print("Jadwal notifikasi untuk $medicineName telah dibuat.");
-  }
-
-  static Future<void> cancelMedicationNotifications({
-    required FlutterLocalNotificationsPlugin localNotificationsPlugin,
-    required String scheduleId,
-  }) async {
     print(
-      "Placeholder for canceling notifications for scheduleId: $scheduleId",
+      "--- PENJADWALAN SELESAI: Total $scheduledCount notifikasi harian telah diatur. ---",
     );
   }
 
