@@ -2,12 +2,14 @@ import 'dart:io'; // Perlu jika Platform.isAndroid digunakan
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+
+// Notification related imports
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest_all.dart' as tz; // Perhatikan as tz
+import 'package:timezone/timezone.dart' as tz; // Perhatikan as tz
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:awesome_notifications/awesome_notifications.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // <-- PENTING: TAMBAHKAN IMPORT INI
+// import 'package:flutter_native_timezone/flutter_native_timezone.dart'; // <-- Baris ini Dihapus/Dikomentari
 
 // Autentikasi dan halaman awal
 import 'pages/welcome_page.dart';
@@ -37,78 +39,100 @@ import 'pages/result_photo_page.dart';
 import 'pages/reward_page.dart';
 import 'pages/reward_code_page.dart';
 
+// Global instance for notifications
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
 
+@pragma('vm:entry-point')
+void onDidReceiveLocalNotification(
+  int id,
+  String? title,
+  String? body,
+  String? payload,
+) async {
+  debugPrint(
+    'onDidReceiveLocalNotification: id=$id, title=$title, body=$body, payload=$payload',
+  );
+  // Di sini Anda bisa menampilkan dialog atau menavigasi jika aplikasi di latar depan (iOS < 10)
+}
+
+// Fungsi untuk membuat notifikasi channel (PENTING untuk Android 8.0+)
+Future<void> _createNotificationChannel() async {
+  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+    'reminder_channel', // id: HARUS sama dengan id channel di AndroidNotificationDetails
+    'Pengingat Obat', // name: Nama yang terlihat oleh pengguna di pengaturan notifikasi
+    description:
+        'Channel untuk notifikasi pengingat minum obat Anda', // deskripsi
+    importance: Importance.max, // Pentingnya notifikasi (seperti Urgent)
+    playSound: true,
+  );
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >()
+      ?.createNotificationChannel(channel);
+  print('DEBUG: Notifikasi channel "reminder_channel" dibuat/diverifikasi.');
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await initializeDateFormatting('id_ID', null);
-  Intl.defaultLocale = 'id_ID';
 
-  // ✅ Inisialisasi Awesome Notifications
-  await AwesomeNotifications().initialize(
-    null, // default icon di Android (null atau path ke icon)
-    [
-      NotificationChannel(
-        channelKey: 'reminder_channel',
-        channelName: 'Pengingat Obat',
-        channelDescription: 'Notifikasi pengingat minum obat harian',
-        defaultColor: Colors.blue,
-        importance: NotificationImportance.High,
-        channelShowBadge: true,
-        locked: true, // Notifikasi tidak bisa digeser atau dihapus oleh pengguna
-        // playSound: true, // Sound diatur di sini
-        // soundSource: 'resource://raw/res_custom_sound', // Untuk custom sound
-      )
-    ],
-    debug: true, // Aktifkan debug log Awesome Notifications
+  // Inisialisasi data simbol lokal untuk intl (penting untuk format tanggal/waktu di berbagai bahasa)
+  await initializeDateFormatting('id_ID', null);
+
+  // --- Inisialisasi Timezone ---
+  tz.initializeTimeZones(); // Menginisialisasi database zona waktu
+  // Karena flutter_native_timezone dihapus, kita set zona waktu secara manual.
+  // Ini mengasumsikan semua pengguna berada di zona waktu yang sama (mis. Jakarta).
+  tz.setLocalLocation(
+    tz.getLocation('Asia/Jakarta'),
+  ); // <-- ATUR SECARA MANUAL ZONA WAKTU DEFAULT
+  print('DEBUG: Zona waktu lokal diatur secara manual ke: Asia/Jakarta');
+  // --- Akhir Inisialisasi Timezone ---
+
+  // --- Inisialisasi FlutterLocalNotificationsPlugin ---
+  const AndroidInitializationSettings initializationSettingsAndroid =
+      AndroidInitializationSettings(
+        '@mipmap/ic_launcher',
+      ); // Pastikan ini ikon yang benar
+
+  final DarwinInitializationSettings initializationSettingsIOS =
+      DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+        // onDidReceiveLocalNotification sudah dihapus di versi 16+
+        // onDidReceiveLocalNotification: onDidReceiveLocalNotification,
+      );
+
+  final InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+    iOS: initializationSettingsIOS,
   );
 
-  // ✅ Minta izin notifikasi Android 13+ dan alarm
-  if (Platform.isAndroid) {
-    // Meminta izin notifikasi umum Awesome Notifications
-    final notifPermission = await AwesomeNotifications().isNotificationAllowed();
-    if (!notifPermission) {
-      print('DEBUG: Meminta izin notifikasi umum Awesome Notifications.');
-      await AwesomeNotifications().requestPermissionToSendNotifications();
-    } else {
-      print('DEBUG: Izin notifikasi umum Awesome Notifications sudah diberikan.');
-    }
+  await flutterLocalNotificationsPlugin.initialize(
+    initializationSettings,
+    onDidReceiveNotificationResponse: (NotificationResponse response) async {
+      debugPrint(
+        'onDidReceiveNotificationResponse: payload: ${response.payload}',
+      );
+      // Di sini Anda bisa menambahkan logika untuk menavigasi ke halaman tertentu
+      // berdasarkan `response.payload` jika notifikasi di-tap.
+    },
+    // Jika Anda ingin menangani tap notifikasi saat aplikasi terminated/background,
+    // Anda perlu `onDidReceiveBackgroundNotificationResponse` dan fungsi top-level lainnya.
+    // @pragma('vm:entry-point')
+    // static void notificationTapBackground(NotificationResponse notificationResponse) { ... }
+    //onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
+  );
+  // --- Akhir Inisialisasi FlutterLocalNotificationsPlugin ---
 
-    // Meminta izin SCHEDULE_EXACT_ALARM menggunakan permission_handler
-    final exactAlarm = await Permission.scheduleExactAlarm.status;
-    if (!exactAlarm.isGranted) {
-      print('DEBUG: Meminta izin SCHEDULE_EXACT_ALARM.');
-      await Permission.scheduleExactAlarm.request();
-    } else {
-      print('DEBUG: Izin SCHEDULE_EXACT_ALARM sudah diberikan.');
-    }
-  }
+  // PENTING: Panggil fungsi untuk membuat/memverifikasi channel notifikasi
+  await _createNotificationChannel(); // <-- PANGGILAN INI DITAMBAHKAN
 
-  // ✅ Cek status login
-  final prefs = await SharedPreferences.getInstance();
-  final bool isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-  final String? userId = prefs.getString('userId'); // Ambil userId juga
-
-  String initialRoute = '/'; // Default route
-
-  if (isLoggedIn == true && userId != null) {
-    // Jika sudah login, cek apakah token Firebase masih valid
-    final user = FirebaseAuth.instance.currentUser; // <-- FirebaseAuth sudah diimport
-    if (user != null && user.uid == userId) {
-      initialRoute = '/home'; // User sudah login dan token valid
-      print('DEBUG: Pengguna sudah login, masuk ke Home.');
-    } else {
-      // Jika token tidak valid (misal, user dihapus dari Firebase), hapus status login
-      await prefs.setBool('isLoggedIn', false);
-      await prefs.remove('userId');
-      print('DEBUG: Token Firebase tidak valid, kembali ke Welcome.');
-    }
-  } else {
-    print('DEBUG: Pengguna belum login, masuk ke Welcome.');
-  }
-
-  runApp(MyApp(initialRoute: initialRoute)); // Kirim initialRoute ke MyApp
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -117,6 +141,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Setting defaultLocale di sini juga tidak masalah, tapi pastikan juga
+    // initializeDateFormatting('id_ID', null); sudah dipanggil sebelum runApp.
+    Intl.defaultLocale = 'id_ID';
+
     return MaterialApp(
       title: 'SembuhTBC',
       debugShowCheckedModeBanner: false,

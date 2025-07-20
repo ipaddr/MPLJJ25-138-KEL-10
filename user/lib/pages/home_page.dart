@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:user/services/auth_service.dart';
-import 'package:user/services/gemini_service.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:user/services/gemini_service.dart'; // Import GeminiService
+import '../../main.dart'; // Supaya bisa akses flutterLocalNotificationsPlugin
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter/services.dart'; // For PlatformException
+import 'package:permission_handler/permission_handler.dart'; // <-- TAMBAHKAN INI
 
 // Import Awesome Notifications
 import 'package:awesome_notifications/awesome_notifications.dart';
@@ -35,84 +37,49 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    Intl.defaultLocale = 'id_ID'; // Ensure locale is set for date formatting
     _checkCurrentUserAndLoadData();
+    // Mengatur locale default untuk format tanggal dan waktu menjadi Bahasa Indonesia
+    Intl.defaultLocale = 'id_ID';
+    // Meminta izin notifikasi saat aplikasi dimulai
+    _requestNotificationPermissions();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_notificationsPermissionsRequested) {
-      _requestNotificationPermissions();
-      _notificationsPermissionsRequested = true;
-    }
-  }
-
+  // Meminta izin notifikasi untuk Android 13+ DAN izin SCHEDULE_EXACT_ALARM
   void _requestNotificationPermissions() async {
-    print("DEBUG: _requestNotificationPermissions called.");
-    // Request general notification permission (Android 13+)
-    final AwesomeNotifications awesomeNotifications = AwesomeNotifications();
-    bool isAllowed = await awesomeNotifications.isNotificationAllowed();
-    if (!isAllowed) {
-      print("DEBUG: General notification permission not granted. Requesting...");
-      isAllowed = await awesomeNotifications.requestPermissionToSendNotifications();
-      if (isAllowed) {
-        print("DEBUG: General notification permission granted.");
-      } else {
-        print("WARN: General notification permission denied.");
-      }
-    } else {
-      print("DEBUG: General notification permission already granted.");
-    }
+    // Permintaan izin notifikasi umum untuk Android 13 (API 33) ke atas
+    if (Theme.of(context).platform == TargetPlatform.android) {
+      final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+          flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
 
-    // Request SCHEDULE_EXACT_ALARM permission
-    final status = await Permission.scheduleExactAlarm.status;
-    if (status.isDenied || status.isRestricted || status.isLimited) {
-      print("DEBUG: Requesting SCHEDULE_EXACT_ALARM permission...");
-      final result = await Permission.scheduleExactAlarm.request();
-      if (result.isGranted) {
-        print("DEBUG: SCHEDULE_EXACT_ALARM permission granted.");
-        setState(() { _exactAlarmPermissionGranted = true; });
-      } else {
-        print("WARN: SCHEDULE_EXACT_ALARM permission denied. Exact reminders may not work.");
-        setState(() { _exactAlarmPermissionGranted = false; });
-        if (result.isDenied || result.isPermanentlyDenied) {
-          _showExactAlarmPermissionDeniedDialog();
+      if (androidImplementation != null) {
+        // Request POST_NOTIFICATIONS permission for Android 13+
+        final bool? granted = await androidImplementation.requestNotificationsPermission();
+        if (granted != null && granted) {
+          print("DEBUG: Izin notifikasi umum Android diberikan.");
+        } else {
+          print("WARN: Izin notifikasi umum Android ditolak.");
         }
       }
-    } else if (status.isGranted) {
-      print("DEBUG: SCHEDULE_EXACT_ALARM permission already granted.");
-      setState(() { _exactAlarmPermissionGranted = true; });
     }
-  }
 
-  void _showExactAlarmPermissionDeniedDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Izin Diperlukan"),
-          content: const Text(
-            "Untuk menjadwalkan pengingat obat yang akurat, aplikasi memerlukan izin 'Alarm & Pengingat'. Mohon aktifkan izin ini di pengaturan aplikasi Anda.",
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text("Nanti"),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            TextButton(
-              child: const Text("Buka Pengaturan"),
-              onPressed: () {
-                openAppSettings();
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        );
-      },
-    );
+    // Permintaan izin SCHEDULE_EXACT_ALARM (untuk Android 12+)
+    // Ini adalah izin runtime, jadi harus diminta dari pengguna
+    final status = await Permission.scheduleExactAlarm.status;
+    if (status.isDenied || status.isRestricted || status.isLimited) {
+      print("DEBUG: Meminta izin SCHEDULE_EXACT_ALARM...");
+      final result = await Permission.scheduleExactAlarm.request();
+      if (result.isGranted) {
+        print("DEBUG: Izin SCHEDULE_EXACT_ALARM diberikan.");
+      } else {
+        print("WARN: Izin SCHEDULE_EXACT_ALARM ditolak. Fitur pengingat tepat mungkin tidak berfungsi.");
+        // Anda bisa menampilkan dialog atau snackbar untuk memberitahu pengguna
+        // bahwa mereka harus mengaktifkannya secara manual dari pengaturan aplikasi.
+        // openAppSettings(); // Membuka pengaturan aplikasi
+      }
+    } else if (status.isGranted) {
+      print("DEBUG: Izin SCHEDULE_EXACT_ALARM sudah diberikan.");
+    }
   }
 
   void _checkCurrentUserAndLoadData() async {
@@ -123,173 +90,90 @@ class _HomePageState extends State<HomePage> {
         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
       });
     } else {
-      print("DEBUG: Current user exists. Loading user profile and rescheduling notifications.");
-      await _loadUserProfile(); // Load profile first
-      // Schedule notifications after profile is loaded and user is confirmed
-      if (_currentUser != null) {
-        _updateAndRescheduleAllNotifications();
-      }
+      _loadUserProfile(); // Muat profil pengguna jika sudah masuk
     }
   }
 
   Future<void> _loadUserProfile() async {
-    print("DEBUG: _loadUserProfile called for user ${_currentUser?.uid}");
-    try {
-      final profile = await _authService.getUserProfile(_currentUser!.uid);
-      if (mounted) {
-        setState(() {
-          _userProfile = profile;
-        });
-        print("DEBUG: User profile loaded: $_userProfile");
-      }
-    } catch (e) {
-      print("ERROR: Failed to load user profile: $e");
-      // Optionally, show an error dialog or sign out the user
+    final profile = await _authService.getUserProfile(_currentUser!.uid);
+    if (mounted) {
+      setState(() {
+        _userProfile = profile; // Perbarui state dengan data profil
+      });
     }
   }
 
-  /// Schedules medication reminder notifications using Awesome Notifications.
-  /// NOTE: This function should be called when medication schedules are created/updated, NOT inside StreamBuilder.
-  Future<void> scheduleReminderNotification({
-    required String medicineName,
-    required String doseTime,
-    required DateTime scheduledDateTime,
-    required String scheduleId, // Add scheduleId for more unique notification IDs
-  }) async {
-    // Check if permission is still granted just before scheduling
-    if (!_exactAlarmPermissionGranted) {
-      print("WARN: 'Alarm & Reminder' permission NOT granted. Notification not scheduled for $medicineName.");
-      return;
-    }
+  /// Menjadwalkan notifikasi pengingat minum obat.
+  /// Notifikasi akan dijadwalkan 5 menit sebelum waktu dosis yang sebenarnya.
+  /// Jika waktu pengingat sudah lewat, akan dijadwalkan untuk hari berikutnya.
+   // ... (kode di atas) ...
 
-    // Calculate reminder time: 5 minutes before the actual dose time
-    final reminderTime = scheduledDateTime.subtract(const Duration(minutes: 5));
-    final now = DateTime.now();
+Future<void> scheduleReminderNotification({
+  required String medicineName,
+  required String doseTime,
+  required DateTime scheduledDateTime, // Ini adalah waktu dosis yang sebenarnya
+}) async {
+  // Hitung waktu notifikasi = 5 menit sebelum waktu minum obat yang dijadwalkan
+  final reminderTime = scheduledDateTime.subtract(const Duration(minutes: 5));
 
-    // Only schedule if the reminder time is in the future
-    if (reminderTime.isBefore(now)) {
-      print('DEBUG: Reminder time for $medicineName at $doseTime has passed. Not scheduled.');
-      return; // Do not schedule if time has already passed
-    }
+  // Dapatkan waktu sekarang di zona waktu lokal
+  final now = tz.TZDateTime.now(tz.local);
 
-    final message = await GeminiService.getReminderMessage(medicineName, doseTime);
-    
-    try {
-      await AwesomeNotifications().createNotification(
-        content: NotificationContent(
-          // Use combination of scheduleId and timestamp for unique ID per dose
-          id: '${scheduleId}_${scheduledDateTime.millisecondsSinceEpoch}'.hashCode,
-          channelKey: 'reminder_channel', // Must match channel defined in main.dart
-          title: 'Pengingat Minum Obat',
-          body: message,
-          notificationLayout: NotificationLayout.Default,
-          payload: {'medicineName': medicineName, 'doseTime': doseTime, 'scheduleId': scheduleId}, // payload must be Map<String, String>
-          category: NotificationCategory.Reminder,
-          wakeUpScreen: true, // To wake up the screen
-          fullScreenIntent: true, // For fullscreen pop-up (requires special permission on Android 10+)
-          autoDismissible: false,
-          icon: 'resource://mipmap/ic_launcher', // Ensures notification icon is set
-          // customSound: 'resource://raw/res_custom_sound', // If you have a custom sound
-        ),
-        schedule: NotificationCalendar.fromDate(
-          date: reminderTime, // Schedule the notification for the reminder time
-          allowWhileIdle: true, // Allow when device is idle
-          repeats: false, // Set false for individual notifications
-          preciseAlarm: true, // Requires SCHEDULE_EXACT_ALARM permission
-        ),
-      );
-      print('SUCCESS: Awesome notification scheduled for $medicineName at ${DateFormat.Hm().format(reminderTime)} (Actual Dose: ${DateFormat.Hm().format(scheduledDateTime)})');
-    } on PlatformException catch (e) {
-      print('ERROR: Failed to schedule Awesome notification due to PlatformException: ${e.code} - ${e.message}');
-    } catch (e) {
-      print('ERROR: Failed to schedule Awesome notification due to unexpected error: $e');
-    }
+  // Variabel untuk waktu notifikasi yang akan digunakan
+  tz.TZDateTime finalScheduledNotificationTime;
+
+  // Logika untuk menjadwalkan notifikasi jika waktu pengingat sudah lewat
+  if (reminderTime.isBefore(now)) {
+    // Jika waktu pengingat sudah lewat hari ini, jadwalkan untuk hari berikutnya pada waktu yang sama
+    finalScheduledNotificationTime = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day,
+      reminderTime.hour,
+      reminderTime.minute,
+      reminderTime.second,
+    ).add(const Duration(days: 1)); // Tambah 1 hari
+    print('DEBUG: Waktu pengingat untuk $medicineName pada $doseTime sudah lewat. Dijadwalkan untuk besok pada ${DateFormat.Hm().format(finalScheduledNotificationTime)}.');
+  } else {
+    // Jika waktu pengingat masih di masa depan hari ini, gunakan waktu tersebut
+    finalScheduledNotificationTime = tz.TZDateTime.from(reminderTime, tz.local);
+    print('DEBUG: Menjadwalkan notifikasi untuk $medicineName pada ${DateFormat.Hm().format(finalScheduledNotificationTime)}.');
   }
 
-  /// Updates and reschedules all active medication notifications.
-  /// This should be called once on app startup (after user login/data load)
-  /// and whenever medication schedules are added, updated, or deleted.
-  Future<void> _updateAndRescheduleAllNotifications() async {
-    if (_currentUser == null) {
-      print("DEBUG: User is null, skipping notification rescheduling.");
-      return;
-    }
-    print("DEBUG: _updateAndRescheduleAllNotifications called.");
+  // Ambil pesan notifikasi dari GeminiService
+  final message = await GeminiService.getReminderMessage(medicineName, doseTime);
 
-    // 1. Cancel all existing notifications for this channel
-    await AwesomeNotifications().cancelNotificationsByChannelKey('reminder_channel');
-    print("DEBUG: All existing notifications in 'reminder_channel' have been cancelled.");
+  // Jadwalkan notifikasi lokal
+  await flutterLocalNotificationsPlugin.zonedSchedule(
+    // ID unik untuk notifikasi ini
+    '${scheduledDateTime.toIso8601String()}_${medicineName}_$doseTime'.hashCode,
+    'Pengingat Minum Obat', // Judul notifikasi
+    message, // Pesan notifikasi dari Gemini
+    finalScheduledNotificationTime, // Waktu notifikasi yang telah disesuaikan
+    const NotificationDetails( // <-- Argumen ke-5: NotificationDetails
+      android: AndroidNotificationDetails(
+        'reminder_channel',
+        'Pengingat Obat',
+        channelDescription: 'Channel untuk notifikasi pengingat minum obat',
+        importance: Importance.max,
+        priority: Priority.high,
+        playSound: true,
+      ),
+      // Untuk iOS, jika Anda perlu pengaturan serupa, gunakan:
+      // iOS: DarwinNotificationDetails(
+      //   presentAlert: true,
+      //   presentBadge: true,
+      //   presentSound: true,
+      //   interruptionLevel: InterruptionLevel.active,
+      // ),
+    ), // <-- PENUTUP NotificationDetails
+    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle, // <-- INI ADALAH NAMED ARGUMENT SETELAH NOTIFICATIONDETAILS
+    // matchDateTimeComponents: DateTimeComponents.time, // Jika ingin notifikasi berulang harian
+  ); // <-- PENUTUP zonedSchedule. Pastikan ini ada dan koma di atasnya benar.
 
-    // 2. Fetch all active medication schedules from Firestore (once)
-    // Using .first to get the initial snapshot from the stream
-    try {
-      final schedulesSnapshot = await AuthService.getMedicationSchedules(_currentUser!.uid).first;
-      print("DEBUG: Fetched ${schedulesSnapshot.length} medication schedules.");
-
-      // 3. Reschedule notifications only for active and future schedules
-      final today = DateTime.now();
-      final todayAtMidnight = DateTime(today.year, today.month, today.day);
-
-      for (final schedule in schedulesSnapshot) {
-        final String medicineName = schedule['medicineName'] ?? 'Obat';
-        final String scheduleId = schedule['id'];
-        final List<String> doseTimes = List<String>.from(schedule['scheduledTimes'] ?? []);
-        final String startDateStr = schedule['startDate'] as String? ?? '1970-01-01';
-        final String endDateStr = schedule['endDate'] as String? ?? '2999-12-31';
-
-        final DateTime scheduleStartDate = DateTime.parse(startDateStr);
-        final DateTime scheduleEndDate = DateTime.parse(endDateStr);
-        final bool isActive = schedule['isActive'] ?? false;
-
-        // Skip schedules that are not active or have already ended
-        if (!isActive || scheduleEndDate.isBefore(todayAtMidnight)) {
-          print("DEBUG: Skipping inactive or past schedule: $medicineName (ID: $scheduleId)");
-          continue;
-        }
-
-        // Loop through each day from today up to the schedule end date (max 1 year)
-        for (int day = 0; day <= 365; day++) { // Limit to 365 days to prevent excessive scheduling
-          final currentProcessingDate = todayAtMidnight.add(Duration(days: day));
-
-          // Stop if we pass the schedule end date
-          if (currentProcessingDate.isAfter(scheduleEndDate)) {
-            break;
-          }
-
-          // Only process dates that are >= scheduleStartDate
-          if (currentProcessingDate.isBefore(scheduleStartDate)) {
-            continue;
-          }
-
-          for (final doseTime in doseTimes) {
-            final parts = doseTime.split(':');
-            final int hour = int.parse(parts[0]);
-            final int minute = int.parse(parts[1]);
-
-            final scheduledDateTime = DateTime(
-              currentProcessingDate.year,
-              currentProcessingDate.month,
-              currentProcessingDate.day,
-              hour,
-              minute,
-            );
-
-            // Call the local scheduling function
-            await scheduleReminderNotification(
-              medicineName: medicineName,
-              doseTime: doseTime,
-              scheduledDateTime: scheduledDateTime,
-              scheduleId: scheduleId,
-            );
-          }
-        }
-      }
-      print("DEBUG: All active notifications have been re-scheduled.");
-    } catch (e) {
-      print("ERROR: Failed to fetch/reschedule notifications: $e");
-    }
-  }
-
+  print('SUCCESS: Notifikasi dijadwalkan untuk $medicineName pada ${DateFormat.Hm().format(finalScheduledNotificationTime)} (Aktual: ${DateFormat.Hm().format(scheduledDateTime)})');
+}
 
   @override
   Widget build(BuildContext context) {
@@ -324,7 +208,7 @@ class _HomePageState extends State<HomePage> {
             return _buildEmptyState();
           }
 
-          print("DEBUG: StreamBuilder has data. Processing schedules.");
+          // Filter jadwal untuk hari yang dipilih
           final allSchedules = snapshot.data!;
           final activeSchedulesToday = allSchedules.where((schedule) {
             final startDate = schedule['startDate'] as String?;
@@ -335,36 +219,48 @@ class _HomePageState extends State<HomePage> {
                 todayStr.compareTo(endDate) <= 0;
           }).toList();
 
-          List<Map<String, dynamic>> scheduledDosesToday = [];
+          // --- Penjadwalan Notifikasi ---
+          // Penting: Batalkan semua notifikasi yang telah dijadwalkan sebelumnya untuk menghindari duplikasi.
+          // Ini sangat krusial karena StreamBuilder bisa rebuild beberapa kali.
+          // Namun, berhati-hatilah dengan `cancelAll()`. Jika Anda memiliki notifikasi lain
+          // yang tidak terkait dengan jadwal obat, mereka juga akan dibatalkan.
+          // Pertimbangkan untuk membatalkan notifikasi hanya dengan ID tertentu jika memungkinkan.
+          flutterLocalNotificationsPlugin.cancelAll(); 
+          
           for (final schedule in activeSchedulesToday) {
+            final medicineName = schedule['medicineName'];
+            // Pastikan scheduledTimes adalah List<String>
             final doseTimes = List<String>.from(schedule['scheduledTimes'] ?? []);
-            for (final time in doseTimes) {
-              scheduledDosesToday.add({
-                'scheduleId': schedule['id'],
-                'medicineName': schedule['medicineName'],
-                'dose': schedule['dose'],
-                'medicineType': schedule['medicineType'],
-                'displayTime': time,
-              });
+
+            for (final doseTime in doseTimes) {
+              // Pisahkan string waktu (misal "08:30" menjadi "08" dan "30")
+              final parts = doseTime.split(':');
+              final int hour = int.parse(parts[0]);
+              final int minute = int.parse(parts[1]);
+              
+              // Buat objek TZDateTime lengkap untuk dosis berdasarkan tanggal yang dipilih dan waktu dosis
+              // Ini penting agar notifikasi dijadwalkan di zona waktu yang benar
+              final scheduledDateTime = tz.TZDateTime(
+                tz.local,
+                _selectedDate.year,
+                _selectedDate.month,
+                _selectedDate.day,
+                hour,
+                minute,
+              );
+
+              // Langsung panggil scheduleReminderNotification.
+              // Logika pengecekan apakah waktu sudah lewat ada di dalam fungsi tersebut.
+              scheduleReminderNotification(
+                medicineName: medicineName,
+                doseTime: doseTime,
+                scheduledDateTime: scheduledDateTime,
+              );
             }
           }
-          scheduledDosesToday.sort(
-            (a, b) => a['displayTime'].compareTo(b['displayTime']),
-          );
+          // --- Akhir Penjadwalan Notifikasi ---
 
-          print("DEBUG: Processed ${scheduledDosesToday.length} doses for selected date.");
-
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 10),
-                _buildDateSelector(),
-                const SizedBox(height: 24),
-                _buildProgressAndScheduleList(scheduledDosesToday),
-              ],
-            ),
-          );
+          return _buildMainContent(allSchedules);
         },
       ),
     );
@@ -467,12 +363,56 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildMainContent(List<Map<String, dynamic>> schedules) {
+    // Filter jadwal yang aktif untuk tanggal yang dipilih
+    final activeSchedulesToday =
+        schedules.where((schedule) {
+          final startDate = schedule['startDate'] as String?;
+          final endDate = schedule['endDate'] as String?;
+          if (startDate == null || endDate == null) return false;
+          final todayStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+          return todayStr.compareTo(startDate) >= 0 &&
+              todayStr.compareTo(endDate) <= 0;
+        }).toList();
+
+    // Buat daftar dosis yang akan ditampilkan untuk hari ini
+    List<Map<String, dynamic>> scheduledDosesToday = [];
+    for (var schedule in activeSchedulesToday) {
+      List<String> times = List<String>.from(schedule['scheduledTimes'] ?? []);
+      for (var time in times) {
+        scheduledDosesToday.add({
+          'scheduleId': schedule['id'],
+          'medicineName': schedule['medicineName'],
+          'dose': schedule['dose'],
+          'medicineType': schedule['medicineType'],
+          'displayTime': time,
+        });
+      }
+    }
+    // Urutkan dosis berdasarkan waktu agar tampilannya rapi
+    scheduledDosesToday.sort(
+      (a, b) => a['displayTime'].compareTo(b['displayTime']),
+    );
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 10),
+          _buildDateSelector(),
+          const SizedBox(height: 24),
+          _buildProgressAndScheduleList(scheduledDosesToday),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDateSelector() {
     return SizedBox(
       height: 90,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: 7, // Display 7 days from today
+        itemCount: 7, // Menampilkan 7 hari dari hari ini
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemBuilder: (context, index) {
           final date = DateTime.now().add(Duration(days: index));
@@ -498,7 +438,7 @@ class _HomePageState extends State<HomePage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    DateFormat('EEE').format(date), // Day name (e.g., "Jum")
+                    DateFormat('EEE').format(date), // Nama hari (misal: "Sen")
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -507,7 +447,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    date.day.toString(), // Date (e.g., "20")
+                    date.day.toString(), // Tanggal (misal: "15")
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -560,7 +500,7 @@ class _HomePageState extends State<HomePage> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Text(
-                "Jadwal Hari Ini (${DateFormat('d MMMM').format(_selectedDate)})",
+                "Jadwal Hari Ini (${DateFormat('d MMMM y').format(_selectedDate)})",
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -626,13 +566,13 @@ class _HomePageState extends State<HomePage> {
     return ListView.builder(
       itemCount: doses.length,
       shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(), // Non-scrollable list
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemBuilder: (context, index) {
         final doseItem = doses[index];
         final scheduleId = doseItem['scheduleId'];
         final doseTime = doseItem['displayTime'];
-        // Check if dose has been taken based on status retrieved from Firebase
+        // Cek apakah dosis sudah diminum berdasarkan status yang diambil dari Firebase
         final bool isTaken = allStatuses[scheduleId]?[doseTime] ?? false;
         return _buildDoseCard(doseItem, isTaken);
       },
@@ -660,12 +600,12 @@ class _HomePageState extends State<HomePage> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          // If already taken, onTap is disabled
+          // Jika sudah diminum, onTap dinonaktifkan
           onTap:
               isTaken
                   ? null
                   : () async {
-                      // Navigate to medication detail page
+                      // Navigasi ke halaman detail obat
                       final result = await Navigator.pushNamed(
                         context,
                         '/med-info',
@@ -675,14 +615,11 @@ class _HomePageState extends State<HomePage> {
                           'dose': doseItem['dose'],
                           'medicineType': doseItem['medicineType'],
                           'doseTime': doseItem['displayTime'],
-                          'selectedDate': _selectedDate.toIso8601String(), // Pass selected date
                         },
                       );
-                      // If there's a change (e.g., medication marked as taken), update UI
+                      // Jika ada perubahan (misal, obat ditandai sudah diminum), perbarui UI
                       if (result == true && mounted) {
-                        setState(() {
-                          // This setState will trigger a rebuild, and StreamBuilder will refetch the latest data.
-                        });
+                        setState(() {});
                       }
                     },
           child: Padding(
@@ -801,14 +738,13 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Retrieves medication progress for scheduled doses on a specific date.
+  /// Mengambil progres minum obat untuk dosis yang dijadwalkan pada tanggal tertentu.
   Future<Map<String, dynamic>> _getMedicationProgress(
     List<Map<String, dynamic>> scheduledDoses,
   ) async {
     print("DEBUG: _getMedicationProgress called for ${scheduledDoses.length} doses.");
     int takenCount = 0;
     final Map<String, Map<String, bool>> statusesBySchedule = {};
-
     if (_currentUser == null) {
       print("DEBUG: _currentUser is null in _getMedicationProgress.");
       return {
@@ -818,12 +754,10 @@ class _HomePageState extends State<HomePage> {
       };
     }
 
-    // Collect unique schedule IDs
+    // Kumpulkan ID jadwal unik
     final scheduleIds =
         scheduledDoses.map((d) => d['scheduleId'] as String).toSet();
-    print("DEBUG: Fetching dose statuses for schedule IDs: $scheduleIds");
-
-    // For each unique schedule ID, fetch its dose taken status
+    // Untuk setiap ID jadwal, ambil status minum obatnya
     for (String id in scheduleIds) {
       try {
         final status = await AuthService.getDoseTakenStatus(
@@ -839,14 +773,13 @@ class _HomePageState extends State<HomePage> {
       }
     }
 
-    // Count taken doses
+    // Hitung jumlah dosis yang sudah diminum
     for (var dose in scheduledDoses) {
       if (statusesBySchedule[dose['scheduleId']]?[dose['displayTime']] ==
           true) {
         takenCount++;
       }
     }
-    print("DEBUG: Calculated taken doses: $takenCount of ${scheduledDoses.length}");
 
     return {
       'taken': takenCount,

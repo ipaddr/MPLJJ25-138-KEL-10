@@ -1,7 +1,6 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.user">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Izin yang dibutuhkan -->
+    <!-- ✅ Izin penggunaan kamera dan penyimpanan -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
@@ -10,16 +9,17 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-    <!-- Menyatakan aplikasi menggunakan kamera -->
+    <!-- ✅ Menyatakan aplikasi butuh kamera -->
     <uses-feature android:name="android.hardware.camera.any" android:required="true" />
 
     <application
+        android:label="user"
         android:name="${applicationName}"
         android:label="SembuhTBC"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
 
-        <!-- Menonaktifkan Impeller jika crash kamera -->
+        <!-- ✅ Nonaktifkan Impeller untuk menghindari crash kamera -->
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="false" />
@@ -36,21 +36,22 @@
             android:windowSoftInputMode="adjustResize">
 
             <meta-data
-                android:name="io.flutter.embedding.android.NormalTheme"
-                android:resource="@style/NormalTheme" />
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+
+            <!-- Firebase notification channel -->
+            <meta-data
+                android:name="com.google.firebase.messaging.default_notification_channel_id"
+                android:value="reminder_channel" />
 
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
 
-        <!-- Untuk notifikasi dari Firebase (opsional) -->
-        <meta-data
-            android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="reminder_channel" />
-
-        <!-- Untuk flutter embedding -->
+        <!-- Flutter Plugin Meta -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
@@ -75,7 +76,7 @@
         </receiver>
     </application>
 
-    <!-- Untuk mendukung intent teks -->
+    <!-- Untuk mendukung intent proses teks -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT" />

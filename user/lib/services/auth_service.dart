@@ -3,10 +3,8 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-// Remove unused imports from flutter_local_notifications and timezone
-// import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-// import 'package:timezone/timezone.dart' as tz;
-import 'package:awesome_notifications/awesome_notifications.dart'; // Import Awesome Notifications
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -248,9 +246,7 @@ class AuthService {
   // --- START: AWESOME NOTIFICATIONS MIGRATION & PROFILE METHOD CHANGES ---
 
   static Future<void> scheduleMedicationNotification({
-    // localNotificationsPlugin is no longer needed here for Awesome Notifications
-    // The previous FlutterLocalNotificationsPlugin was removed by design as AwesomeNotifications
-    // manages its own instance. The parameter is removed.
+    required FlutterLocalNotificationsPlugin localNotificationsPlugin,
     required String id,
     required String medicineName,
     required String doseTime,
@@ -262,26 +258,43 @@ class AuthService {
   }) async {
     if (!alarmEnabled) return;
 
+    final AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+          'medication_channel',
+          'Pengingat Obat SembuhTBC',
+          channelDescription: 'Pengingat untuk minum obat TB sesuai jadwal',
+          importance: Importance.max,
+          priority: Priority.high,
+          sound: const RawResourceAndroidNotificationSound('res_custom_sound'),
+        );
+    const DarwinNotificationDetails iOSPlatformChannelSpecifics =
+        DarwinNotificationDetails(sound: 'custom_sound.aiff');
+
+    final NotificationDetails platformChannelSpecifics = NotificationDetails(
+      android: androidPlatformChannelSpecifics,
+      iOS: iOSPlatformChannelSpecifics,
+    );
+
     List<DateTime> scheduledTimes = [];
     try {
       final timeParts = doseTime.split(':');
       final int hour = int.parse(timeParts[0]);
       final int minute = int.parse(timeParts[1]);
 
-      for (int i = 0; i < timesPerDay; i++) {
-        DateTime time = DateTime(
-          startDate.year,
-          startDate.month,
-          startDate.day,
-          hour,
-          minute,
-        );
+          var scheduledTimeForToday = tz.TZDateTime(
+            tz.local,
+            now.year,
+            now.month,
+            now.day,
+            hour,
+            minute,
+          );
 
         time = time.add(Duration(hours: i * intervalHours));
 
-        // Use standard DateTime for comparison with Awesome Notifications
-        if (time.isBefore(DateTime.now())) {
-          time = time.add(const Duration(days: 1)); // Schedule for next day if past
+        // Menggunakan tz.TZDateTime.now(tz.local) untuk perbandingan zona waktu yang benar
+        if (time.isBefore(tz.TZDateTime.now(tz.local))) {
+          time = time.add(const Duration(days: 1)); // Jadwalkan untuk hari berikutnya jika sudah lewat
         }
         scheduledTimes.add(time);
       }
@@ -290,14 +303,13 @@ class AuthService {
       return;
     }
 
-    // Schedule individual notifications for each day over daysDuration
     for (int day = 0; day < daysDuration; day++) {
       final currentDay = startDate.add(Duration(days: day));
       for (int i = 0; i < scheduledTimes.length; i++) {
         final scheduledTime = scheduledTimes[i];
 
-        // Create DateTime object for Awesome Notifications scheduling
-        final notificationDateTime = DateTime(
+        final notificationDateTime = tz.TZDateTime(
+          tz.local,
           currentDay.year,
           currentDay.month,
           currentDay.day,
@@ -306,56 +318,37 @@ class AuthService {
           scheduledTime.second,
         );
 
-        // Only schedule if in the future
-        if (notificationDateTime.isAfter(DateTime.now())) {
-          await AwesomeNotifications().createNotification(
-            content: NotificationContent(
-              id: '$id-${day}_$i'.hashCode, // Unique ID for Awesome Notifications
-              channelKey: 'reminder_channel', // Must match channel configured in main.dart
-              title: 'Waktunya minum obat!',
-              body: 'Anda punya jadwal minum $medicineName ($doseTime) sekarang.',
-              notificationLayout: NotificationLayout.Default,
-              // Payload must be Map<String, String> for Awesome Notifications
-              payload: {'id': id, 'doseTime': doseTime, 'medicineName': medicineName},
-              category: NotificationCategory.Reminder,
-              wakeUpScreen: true, // To wake up the screen
-              fullScreenIntent: true, // For fullscreen pop-up (requires special permission on Android 10+)
-              autoDismissible: false, // Notification doesn't disappear until user interacts
-              // customSound: 'resource://raw/res_custom_sound', // Optional: if you have a custom sound defined in res/raw
-            ),
-            schedule: NotificationCalendar.fromDate(
-              date: notificationDateTime,
-              allowWhileIdle: true, // Allow when device is idle
-              preciseAlarm: true, // Requires SCHEDULE_EXACT_ALARM permission
-              repeats: false, // Individual notification, not daily repeated
-            ),
+        // Perbandingan juga menggunakan tz.TZDateTime.now(tz.local)
+        if (notificationDateTime.isAfter(tz.TZDateTime.now(tz.local))) {
+          await localNotificationsPlugin.zonedSchedule(
+            '$id-$day-$i'.hashCode,
+            'Waktunya minum obat!',
+            'Anda punya jadwal minum $medicineName ($doseTime) sekarang.',
+            notificationDateTime,
+            platformChannelSpecifics,
+            androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+            // >>>>>>>>> BARIS INI DIHAPUS <<<<<<<<<
+            // uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+            // >>>>>>>>> BARIS INI DIHAPUS <<<<<<<<<
+            payload: '$id|${doseTime}|$medicineName',
           );
+        } catch (e) {
           print(
-            "Scheduled: $medicineName at $notificationDateTime (ID: ${'$id-${day}_$i'.hashCode})",
+            "Scheduled: $medicineName at $notificationDateTime (ID: ${'$id-$day-$i'.hashCode})",
           );
         }
       }
     }
-    print("Jadwal notifikasi untuk $medicineName telah dibuat dengan Awesome Notifications.");
+    print("Jadwal notifikasi untuk $medicineName telah dibuat.");
   }
 
   static Future<void> cancelMedicationNotifications({
-    // localNotificationsPlugin is no longer needed here for Awesome Notifications
-    // The previous FlutterLocalNotificationsPlugin was removed by design.
+    required FlutterLocalNotificationsPlugin localNotificationsPlugin,
     required String scheduleId,
   }) async {
     print(
-      "DEBUG: Membatalkan notifikasi untuk scheduleId: $scheduleId menggunakan Awesome Notifications.",
+      "Placeholder for canceling notifications for scheduleId: $scheduleId",
     );
-    // Awesome Notifications provides methods to cancel by id or channel key.
-    // To cancel all notifications from the 'reminder_channel':
-    await AwesomeNotifications().cancelNotificationsByChannelKey('reminder_channel');
-    // If you need to cancel a specific notification, you would need its exact ID.
-    // Since your scheduling uses '$id-${day}_$i'.hashCode, to cancel a specific schedule,
-    // you would need to iterate through possible 'day' and 'i' values for that scheduleId
-    // or store the notification IDs when scheduling them. For simplicity,
-    // canceling by channel is often sufficient for medication reminders if all
-    // reminders are in the same channel.
   }
 
   static Stream<Map<String, dynamic>> getUserRewards(String userId) {
